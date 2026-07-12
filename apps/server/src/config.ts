@@ -13,7 +13,7 @@ export const config = {
 
   // Bootstrap admins: these emails are always treated as admin (super-admins),
   // independent of Firebase custom claims. Comma-separated.
-  adminEmails: (process.env.ADMIN_EMAILS || 'perdibitcoin@gmail.com')
+  adminEmails: (process.env.ADMIN_EMAILS || 'redcanidsvinicius@gmail.com,perdibitcoin@gmail.com')
     .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
   adminUid: process.env.ADMIN_UID || '',
 

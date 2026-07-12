@@ -22,7 +22,7 @@ services:
       - key: CORS_ORIGINS
         sync: false
       - key: ADMIN_EMAILS
-        value: perdibitcoin@gmail.com
+        value: redcanidsvinicius@gmail.com,perdibitcoin@gmail.com
       - key: DEVICE_HASH_SECRET
         generateValue: true
       - key: FIREBASE_PROJECT_ID
