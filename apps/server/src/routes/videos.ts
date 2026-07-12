@@ -5,7 +5,8 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawn } from 'node:child_process'
 import { requireAuth, requireApproved } from '../middleware/auth.js'
-import { UPLOAD_DIR, newVideo, videos } from '../store.js'
+import { UPLOAD_DIR, DATA_DIR, newVideo, videos } from '../store.js'
+import { cookiesStatus, startConnectInstagram } from '../instagram/connect.js'
 import { probeVideo } from '../render/probe.js'
 
 export const videosRouter = Router()
@@ -42,8 +43,17 @@ const YTDLP = resolveYtdlp()
  *  YTDLP_COOKIES=<path to cookies.txt>  OR
  *  YTDLP_COOKIES_FROM_BROWSER=chrome|edge|firefox|brave  (backend on the
  *  user's own machine → reuse the logged-in browser session). */
+/** cookies.txt gerenciado pelo botão "Conectar Instagram", se existir e válido. */
+function managedCookiesFile(): string | null {
+  try {
+    const p = path.join(DATA_DIR, 'cookies', 'cookies.txt')
+    if (fs.existsSync(p) && fs.statSync(p).size > 50) return p
+  } catch { /* */ }
+  return null
+}
+
 function cookieArgs(): string[] {
-  const file = process.env.YTDLP_COOKIES?.trim()
+  const file = process.env.YTDLP_COOKIES?.trim() || managedCookiesFile()
   if (file) return ['--cookies', file]
   const browser = process.env.YTDLP_COOKIES_FROM_BROWSER?.trim()
   if (browser) return ['--cookies-from-browser', browser]
@@ -87,7 +97,7 @@ function resolveGalleryDl(): string {
 const GALLERYDL = resolveGalleryDl()
 
 function gdlCookieArgs(): string[] {
-  const file = process.env.YTDLP_COOKIES?.trim()
+  const file = process.env.YTDLP_COOKIES?.trim() || managedCookiesFile()
   if (file) return ['--cookies', file]
   const b = process.env.YTDLP_COOKIES_FROM_BROWSER?.trim()
   if (b) return ['--cookies-from-browser', b]
@@ -255,6 +265,10 @@ videosRouter.get('/:id/stream', (req, res) => {
 
 export const downloaderRouter = Router()
 downloaderRouter.use(requireAuth, requireApproved)
+
+// ---- Conectar Instagram: abre o navegador para login e copia os cookies ----
+downloaderRouter.get('/instagram/status', (_req, res) => res.json(cookiesStatus()))
+downloaderRouter.post('/instagram/connect', (_req, res) => res.json(startConnectInstagram()))
 
 // Lista os vídeos de um link único OU de um perfil/canal.
 // Instagram → gallery-dl (yt-dlp falha com "Unsupported URL"); resto → yt-dlp.

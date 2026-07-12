@@ -125,9 +125,24 @@ export async function loadRenderStats(uid: string) {
   } catch { /* firestore disabled */ }
   events.sort((a, b) => (b.at || '').localeCompare(a.at || ''))
 
+  // logins do usuário → parte da "atividade / tempo de uso" por hora e dia
+  const logins: string[] = []
+  try {
+    const snap = await db.collection('user_login_events').where('userId', '==', uid).limit(1000).get()
+    snap.forEach((d) => { const t = d.data()?.loginAt; if (t) logins.push(t) })
+  } catch { /* firestore disabled */ }
+
   let totalCuts = 0
   const profileMap = new Map<string, { name: string; handle: string; count: number }>()
   const sourceMap = new Map<string, number>()
+  // atividade por hora do dia (0-23) e por dia — histórico TOTAL
+  const byHour = Array.from({ length: 24 }, (_, hour) => ({ hour, cuts: 0, sessions: 0 }))
+  const byDayMap = new Map<string, { cuts: number; sessions: number }>()
+  const dayBucket = (iso: string) => {
+    const b = byDayMap.get(iso.slice(0, 10)) || { cuts: 0, sessions: 0 }
+    byDayMap.set(iso.slice(0, 10), b); return b
+  }
+
   for (const e of events) {
     totalCuts += e.count || 0
     const key = (e.profileHandle || e.profileName || '—').toLowerCase()
@@ -135,7 +150,24 @@ export async function loadRenderStats(uid: string) {
     prev.count += e.count || 0
     profileMap.set(key, prev)
     for (const s of (e.sources || [])) if (s) sourceMap.set(s, (sourceMap.get(s) || 0) + 1)
+    if (e.at) {
+      const d = new Date(e.at)
+      if (!Number.isNaN(d.getTime())) { byHour[d.getHours()].cuts += e.count || 0; dayBucket(e.at).cuts += e.count || 0 }
+    }
   }
+  for (const t of logins) {
+    const d = new Date(t)
+    if (!Number.isNaN(d.getTime())) { byHour[d.getHours()].sessions += 1; dayBucket(t).sessions += 1 }
+  }
+
+  const peak = byHour.reduce((mx, x) => (x.cuts > mx.cuts ? x : mx), byHour[0])
+  const busiest = byHour.reduce((mx, x) => ((x.cuts + x.sessions) > (mx.cuts + mx.sessions) ? x : mx), byHour[0])
+  const byDay = [...byDayMap.entries()]
+    .map(([date, v]) => ({ date, cuts: v.cuts, sessions: v.sessions }))
+    .sort((a, b) => a.date.localeCompare(b.date)).slice(-45)
+  const activeDays = byDayMap.size
+  const times = [...events.map((e) => e.at), ...logins].filter(Boolean).sort()
+
   return {
     totalCuts, renders: events.length,
     profilesUsed: [...profileMap.values()].sort((a, b) => b.count - a.count),
@@ -144,6 +176,12 @@ export async function loadRenderStats(uid: string) {
       at: e.at, count: e.count || 0, profileName: e.profileName || '', profileHandle: e.profileHandle || '',
       sources: e.sources || [],
     })),
+    activity: {
+      byHour, byDay, activeDays, logins: logins.length,
+      peakHourByCuts: peak.cuts > 0 ? peak.hour : null,
+      peakHourByUse: (busiest.cuts + busiest.sessions) > 0 ? busiest.hour : null,
+      firstAt: times[0] || null, lastAt: times[times.length - 1] || null,
+    },
   }
 }
 

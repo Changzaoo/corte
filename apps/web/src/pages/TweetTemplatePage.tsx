@@ -6,6 +6,7 @@ import {
 import { api, type Clip, type JobStatus, type ProfileVideo } from '../api'
 import { Button, ClearableInput, useContextMenu } from '../components/ui'
 import LiveRendersPanel from '../components/LiveRenders'
+import InstagramConnect from '../components/InstagramConnect'
 
 type CardTheme = 'light' | 'dark'
 type CardMode = 'auto' | 'card' | 'reskin'
@@ -688,6 +689,11 @@ export default function TweetTemplatePage() {
                 </div>
               )
             })()}
+
+            <div className="mb-sm flex flex-wrap items-center gap-xs">
+              <InstagramConnect />
+              <span className="text-[10px] text-slate-500">Conecte o Instagram uma vez para baixar reels/perfis privados ou logados.</span>
+            </div>
 
             <div className="mb-sm flex gap-xs">
               <ClearableInput value={urlInput} onChange={setUrlInput}

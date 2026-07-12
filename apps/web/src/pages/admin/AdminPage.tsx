@@ -77,7 +77,7 @@ function UserDrawer({ uid, onClose, onChanged }: {
   const { toast } = useContextMenu()
   const { profile: me } = useAuth()
   const [data, setData] = useState<AdminUserDetails | null>(null)
-  const [tab, setTab] = useState<'summary' | 'cuts' | 'logins' | 'devices' | 'notes'>('summary')
+  const [tab, setTab] = useState<'summary' | 'cuts' | 'activity' | 'logins' | 'devices' | 'notes'>('summary')
   const [loading, setLoading] = useState(true)
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
@@ -149,10 +149,10 @@ function UserDrawer({ uid, onClose, onChanged }: {
 
             {/* tabs */}
             <div className="flex shrink-0 gap-xs border-b border-slate-800 px-lg">
-              {(['summary', 'cuts', 'logins', 'devices', 'notes'] as const).map((t) => (
+              {(['summary', 'cuts', 'activity', 'logins', 'devices', 'notes'] as const).map((t) => (
                 <button key={t} onClick={() => setTab(t)}
                   className={`relative px-sm py-sm text-xs font-semibold capitalize ${tab === t ? 'text-slate-50' : 'text-slate-500 hover:text-slate-300'}`}>
-                  {t === 'summary' ? 'Resumo' : t === 'cuts' ? 'Cortes' : t === 'logins' ? 'Logins' : t === 'devices' ? 'Dispositivos' : 'Notas'}
+                  {t === 'summary' ? 'Resumo' : t === 'cuts' ? 'Cortes' : t === 'activity' ? 'Atividade' : t === 'logins' ? 'Logins' : t === 'devices' ? 'Dispositivos' : 'Notas'}
                   {tab === t && <span className="absolute inset-x-1 -bottom-px h-[2px] rounded bg-primary-500" />}
                 </button>
               ))}
@@ -234,6 +234,63 @@ function UserDrawer({ uid, onClose, onChanged }: {
                         </div>
                       </div>
                     )}
+                  </div>
+                )
+              })()}
+
+              {tab === 'activity' && (() => {
+                const a = data!.renderStats.activity
+                const maxHour = Math.max(1, ...a.byHour.map((h) => h.cuts))
+                const maxUse = Math.max(1, ...a.byHour.map((h) => h.cuts + h.sessions))
+                const fmtH = (h: number | null) => (h == null ? '—' : `${String(h).padStart(2, '0')}h`)
+                return (
+                  <div className="space-y-md">
+                    <div className="grid grid-cols-3 gap-sm">
+                      <div className="rounded-lg border border-slate-800 bg-slate-925 px-md py-sm">
+                        <p className="text-2xl font-bold text-primary-300">{fmtH(a.peakHourByUse)}</p>
+                        <p className="text-[10px] uppercase tracking-wide text-slate-500">Horário + ativo</p>
+                      </div>
+                      <div className="rounded-lg border border-slate-800 bg-slate-925 px-md py-sm">
+                        <p className="text-2xl font-bold text-slate-50">{a.activeDays}</p>
+                        <p className="text-[10px] uppercase tracking-wide text-slate-500">Dias ativos</p>
+                      </div>
+                      <div className="rounded-lg border border-slate-800 bg-slate-925 px-md py-sm">
+                        <p className="text-2xl font-bold text-slate-50">{a.logins}</p>
+                        <p className="text-[10px] uppercase tracking-wide text-slate-500">Logins</p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="mb-xs text-[11px] font-semibold uppercase tracking-wide text-slate-500">Uso por hora do dia (histórico total)</p>
+                      <div className="flex h-28 items-end gap-[2px]">
+                        {a.byHour.map((h) => (
+                          <div key={h.hour} className="group relative flex-1"
+                            title={`${h.hour}h — ${h.cuts} corte(s), ${h.sessions} login(s)`}>
+                            <div className="w-full rounded-t bg-slate-800" style={{ height: '100%' }}>
+                              <div className="flex h-full flex-col justify-end">
+                                <div className="w-full rounded-t bg-primary-500"
+                                  style={{ height: `${((h.cuts + h.sessions) / maxUse) * 100}%` }} />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-[2px] flex justify-between text-[9px] text-slate-600">
+                        <span>0h</span><span>6h</span><span>12h</span><span>18h</span><span>23h</span>
+                      </div>
+                      <p className="mt-xs text-[10px] text-slate-500">
+                        Pico de cortes às <span className="text-slate-300">{fmtH(a.peakHourByCuts)}</span>. Barras = cortes + logins por hora, somando todos os dias.
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="mb-xs text-[11px] font-semibold uppercase tracking-wide text-slate-500">Cortes por dia (últimos {Math.min(14, a.byDay.length)})</p>
+                      <BarList data={a.byDay.slice(-14).map((d) => ({ name: d.date.slice(5), count: d.cuts }))} max={maxHour > 0 ? undefined : 1} />
+                    </div>
+
+                    <div className="rounded-lg border border-slate-850 bg-slate-925 px-sm py-xs text-[11px] text-slate-400">
+                      Primeira atividade <span className="text-slate-200">{timeAgo(a.firstAt)}</span> · última <span className="text-slate-200">{timeAgo(a.lastAt)}</span>
+                    </div>
                   </div>
                 )
               })()}

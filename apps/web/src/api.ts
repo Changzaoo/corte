@@ -93,6 +93,13 @@ export interface RenderStats {
   profilesUsed: { name: string; handle: string; count: number }[]
   sources: { url: string; count: number }[]
   recent: { at: string; count: number; profileName: string; profileHandle: string; sources: string[] }[]
+  activity: {
+    byHour: { hour: number; cuts: number; sessions: number }[]
+    byDay: { date: string; cuts: number; sessions: number }[]
+    activeDays: number; logins: number
+    peakHourByCuts: number | null; peakHourByUse: number | null
+    firstAt: string | null; lastAt: string | null
+  }
 }
 export interface AdminUserDetails {
   user: AdminUser; loginEvents: LoginEvent[]; devices: DeviceRecord[]
@@ -175,6 +182,8 @@ export const api = {
   streamUrl: (id: number, token?: string) =>
     `${API_URL()}/api/videos/${id}/stream${token ? `?token=${encodeURIComponent(token)}` : ''}`,
   listProfileVideos: (url: string) => request<ProfileVideos>('POST', '/api/downloader/list', { url }),
+  instagramStatus: () => request<{ connected: boolean; count: number; connecting: boolean; message: string }>('GET', '/api/downloader/instagram/status'),
+  instagramConnect: () => request<{ started: boolean; message: string }>('POST', '/api/downloader/instagram/connect'),
 
   // current Firebase idToken — needed to authenticate media loaded via
   // <video src>/<a href> (which can't carry an Authorization header).
