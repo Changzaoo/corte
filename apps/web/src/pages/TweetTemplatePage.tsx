@@ -563,7 +563,8 @@ export default function TweetTemplatePage() {
                     <div key={p.id} onClick={() => selectProfile(p)} title={`Usar @${p.handle}`}
                       className={`group relative flex shrink-0 cursor-pointer items-center gap-xs rounded-full border py-[3px] pl-[3px] pr-sm ${active ? 'border-primary-500 bg-primary-500/10' : 'border-slate-700 bg-slate-800/60 hover:border-slate-500'}`}>
                       {p.avatarId
-                        ? <img src={api.tweetAvatarUrl(p.avatarId)} alt="" className="h-6 w-6 rounded-full object-cover" />
+                        ? <img src={api.tweetAvatarUrl(p.avatarId)} alt="" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+                            className="h-6 w-6 rounded-full object-cover" />
                         : <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold text-white">{(p.name.trim()[0] || '?').toUpperCase()}</span>}
                       <span className="max-w-[110px] truncate text-[11px] text-slate-200">{p.name}</span>
                       {active && <CheckCircle2 className="h-3 w-3 shrink-0 text-primary-400" />}
@@ -580,7 +581,8 @@ export default function TweetTemplatePage() {
             <div className="flex items-center gap-sm">
               <label className="group relative cursor-pointer" title="Trocar avatar">
                 {avatarPreview
-                  ? <img src={avatarPreview} alt="" className="h-14 w-14 rounded-full object-cover ring-2 ring-slate-700 group-hover:ring-primary-500" />
+                  ? <img src={avatarPreview} alt="" onError={() => { setAvatarPreview(null); setAvatarId(null) }}
+                      className="h-14 w-14 rounded-full object-cover ring-2 ring-slate-700 group-hover:ring-primary-500" />
                   : <span className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-500 text-lg font-bold text-white ring-2 ring-slate-700 group-hover:ring-primary-500">{(name.trim()[0] || '?').toUpperCase()}</span>}
                 <span className="absolute -bottom-1 -right-1 rounded-full bg-slate-700 p-1 text-slate-200"><Upload className="h-3 w-3" /></span>
                 <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadAvatar(e.target.files[0])} />
