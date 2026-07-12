@@ -151,6 +151,16 @@ export default function TweetTemplatePage() {
   const [job, setJob] = useState<JobStatus | null>(null)
   const [clips, setClips] = useState<Clip[]>([])
   const [error, setError] = useState<string | null>(null)
+  // idToken used to authenticate media loaded via <video src>/<a href download>
+  const [mediaToken, setMediaToken] = useState<string | null>(null)
+  const [selectedClips, setSelectedClips] = useState<Set<number>>(new Set())
+  useEffect(() => {
+    if (jobId == null) { setMediaToken(null); setSelectedClips(new Set()); return }
+    let alive = true
+    api.authToken().then(t => { if (alive) setMediaToken(t) })
+    return () => { alive = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobId, clips.length])
   const [renderedKeys, setRenderedKeys] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem(RENDERED_KEY) || '[]') } catch { return [] }
   })
@@ -390,11 +400,24 @@ export default function TweetTemplatePage() {
               <span className="flex items-center gap-xs text-sm text-slate-300"><Loader2 className="h-4 w-4 animate-spin" /> {job?.stage_detail || 'Gerando…'}{job?.progress ? ` (${Math.round(job.progress)}%)` : ''}</span>
             )}
             <div className="ml-auto flex flex-wrap items-center gap-xs">
-              {clips.length > 1 && (
-                <a href={api.downloadAllUrl(jobId)}
-                  className="inline-flex items-center gap-xs rounded-md border border-slate-700 px-md py-xs text-xs text-slate-300 hover:bg-slate-800">
-                  <Package className="w-3 h-3" /> zip
-                </a>
+              {clips.length > 0 && (
+                <>
+                  <Button variant="ghost" size="sm"
+                    onClick={() => setSelectedClips(prev =>
+                      prev.size === clips.length ? new Set() : new Set(clips.map(c => c.id)))}>
+                    {selectedClips.size === clips.length && clips.length > 0 ? 'Limpar seleção' : 'Selecionar todos'}
+                  </Button>
+                  <a href={api.downloadAllUrl(jobId, mediaToken ?? undefined)}
+                    className="inline-flex items-center gap-xs rounded-md border border-slate-700 px-md py-xs text-xs text-slate-300 hover:bg-slate-800">
+                    <Package className="w-3 h-3" /> Baixar todos (.zip)
+                  </a>
+                  {selectedClips.size > 0 && (
+                    <a href={api.downloadAllUrl(jobId, mediaToken ?? undefined, [...selectedClips])}
+                      className="inline-flex items-center gap-xs rounded-md border border-primary-500/50 bg-primary-500/10 px-md py-xs text-xs text-primary-200 hover:bg-primary-500/20">
+                      <Package className="w-3 h-3" /> Baixar {selectedClips.size} selecionado(s) (.zip)
+                    </a>
+                  )}
+                </>
               )}
               <Button variant="secondary" size="sm" onClick={() => {
                 if (pollRef.current) clearTimeout(pollRef.current)
@@ -426,18 +449,28 @@ export default function TweetTemplatePage() {
                 <p className="mb-sm text-[11px] font-semibold uppercase tracking-wide text-slate-500">Prontos ({clips.length})</p>
               )}
               <div className="grid grid-cols-2 gap-md sm:grid-cols-3 md:grid-cols-4">
-                {clips.map(c => (
-                  <div key={c.id} className="overflow-hidden rounded-lg border border-slate-800 bg-slate-900">
-                    <video src={api.downloadClip(c.id)} controls preload="metadata" className="aspect-[9/16] w-full bg-black object-contain" />
+                {clips.map(c => {
+                  const sel = selectedClips.has(c.id)
+                  return (
+                  <div key={c.id} className={`overflow-hidden rounded-lg border bg-slate-900 ${sel ? 'border-primary-500' : 'border-slate-800'}`}>
+                    <div className="relative">
+                      <video src={api.downloadClip(c.id, mediaToken ?? undefined)} controls preload="metadata" className="aspect-[9/16] w-full bg-black object-contain" />
+                      <button type="button" title={sel ? 'Desmarcar' : 'Selecionar'}
+                        onClick={() => setSelectedClips(prev => { const n = new Set(prev); n.has(c.id) ? n.delete(c.id) : n.add(c.id); return n })}
+                        className={`absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded-full border-2 text-xs font-bold transition-colors ${sel ? 'border-primary-500 bg-primary-500 text-white' : 'border-white/70 bg-black/50 text-transparent hover:border-white'}`}>
+                        ✓
+                      </button>
+                    </div>
                     <div className="flex items-center gap-xs p-sm">
                       <span className="flex-1 truncate text-xs text-slate-300">{c.topic_label || c.title || `Vídeo ${c.id}`}</span>
-                      <a href={api.downloadClip(c.id)} download title="Baixar"
+                      <a href={api.downloadClip(c.id, mediaToken ?? undefined)} download title="Baixar"
                         className="rounded p-xs text-slate-400 hover:bg-slate-800 hover:text-slate-200">
                         <Download className="h-3.5 w-3.5" />
                       </a>
                     </div>
                   </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           )}

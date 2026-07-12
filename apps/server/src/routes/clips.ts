@@ -23,7 +23,12 @@ clipsRouter.get('/', (req, res) => {
 clipsRouter.get('/download-all', (req, res) => {
   const owner = res.locals.user!.uid
   const jobId = Number(req.query.job_id)
-  const list = [...clips.values()].filter((c) => c.owner === owner && c.jobId === jobId && fs.existsSync(c.path))
+  // optional subset: ?ids=1,2,3 → zip only those clips (baixar selecionados)
+  const idsParam = typeof req.query.ids === 'string' ? req.query.ids : ''
+  const onlyIds = new Set(idsParam.split(',').map((s) => Number(s.trim())).filter((n) => Number.isFinite(n) && n > 0))
+  const list = [...clips.values()].filter((c) =>
+    c.owner === owner && c.jobId === jobId && fs.existsSync(c.path) &&
+    (onlyIds.size === 0 || onlyIds.has(c.id)))
   if (!list.length) return res.status(404).json({ error: 'Nenhum vídeo' })
   res.setHeader('Content-Type', 'application/zip')
   res.setHeader('Content-Disposition', `attachment; filename="template_${jobId}.zip"`)

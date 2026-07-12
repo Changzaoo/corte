@@ -133,14 +133,27 @@ export const api = {
     return upload<PreparedVideo>('/api/videos/prepare', fd)
   },
   getVideoInfo: (id: number) => request<VideoInfo>('GET', `/api/videos/${id}`),
-  streamUrl: (id: number) => `${API_URL}/api/videos/${id}/stream`,
+  streamUrl: (id: number, token?: string) =>
+    `${API_URL}/api/videos/${id}/stream${token ? `?token=${encodeURIComponent(token)}` : ''}`,
   listProfileVideos: (url: string) => request<ProfileVideos>('POST', '/api/downloader/list', { url }),
+
+  // current Firebase idToken — needed to authenticate media loaded via
+  // <video src>/<a href> (which can't carry an Authorization header).
+  authToken: async (): Promise<string | null> => {
+    try { return (await auth.currentUser?.getIdToken()) || null } catch { return null }
+  },
 
   // ---- jobs / clips --------------------------------------------------------
   getJob: (id: number) => request<JobStatus>('GET', `/api/jobs/${id}`),
   listClips: (jobId: number) => request<Clip[]>('GET', `/api/clips?job_id=${jobId}`),
-  downloadClip: (id: number) => `${API_URL}/api/clips/${id}/download`,
-  downloadAllUrl: (jobId: number) => `${API_URL}/api/clips/download-all?job_id=${jobId}`,
+  downloadClip: (id: number, token?: string) =>
+    `${API_URL}/api/clips/${id}/download${token ? `?token=${encodeURIComponent(token)}` : ''}`,
+  downloadAllUrl: (jobId: number, token?: string, ids?: number[]) => {
+    const qs = new URLSearchParams({ job_id: String(jobId) })
+    if (ids && ids.length) qs.set('ids', ids.join(','))
+    if (token) qs.set('token', token)
+    return `${API_URL}/api/clips/download-all?${qs.toString()}`
+  },
 
   // ---- tweet template ------------------------------------------------------
   tweetUploadAvatar: (file: File) => {

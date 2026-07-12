@@ -2,6 +2,7 @@ import { Router } from 'express'
 import multer from 'multer'
 import fs from 'node:fs'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { spawn } from 'node:child_process'
 import { requireAuth } from '../middleware/auth.js'
 import { UPLOAD_DIR, newVideo, videos } from '../store.js'
@@ -19,7 +20,35 @@ const storage = multer.diskStorage({
 })
 const upload = multer({ storage, limits: { fileSize: 500 * 1024 * 1024 } })
 
-const YTDLP = process.env.YTDLP_PATH || 'yt-dlp'
+/** Resolve the yt-dlp binary: explicit env override first, then a binary
+ *  bundled at apps/server/bin (used in prod/Render where PATH has no yt-dlp),
+ *  then fall back to whatever is on PATH. */
+function resolveYtdlp(): string {
+  const binName = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp'
+  const here = path.dirname(fileURLToPath(import.meta.url))
+  const candidates = [
+    process.env.YTDLP_PATH,
+    path.resolve(here, '../../../bin', binName), // dist/src/routes -> apps/server/bin (build)
+    path.resolve(here, '../../bin', binName),    // src/routes     -> apps/server/bin (dev)
+    path.resolve(process.cwd(), 'apps/server/bin', binName),
+    path.resolve(process.cwd(), 'bin', binName),
+  ].filter(Boolean) as string[]
+  for (const c of candidates) { try { if (fs.existsSync(c)) return c } catch { /* ignore */ } }
+  return 'yt-dlp'
+}
+const YTDLP = resolveYtdlp()
+
+/** Cookie args for sites that block anonymous access (Instagram, TikTok…).
+ *  YTDLP_COOKIES=<path to cookies.txt>  OR
+ *  YTDLP_COOKIES_FROM_BROWSER=chrome|edge|firefox|brave  (backend on the
+ *  user's own machine → reuse the logged-in browser session). */
+function cookieArgs(): string[] {
+  const file = process.env.YTDLP_COOKIES?.trim()
+  if (file) return ['--cookies', file]
+  const browser = process.env.YTDLP_COOKIES_FROM_BROWSER?.trim()
+  if (browser) return ['--cookies-from-browser', browser]
+  return []
+}
 
 function ytdlp(args: string[], timeoutMs = 180_000): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -70,7 +99,7 @@ videosRouter.post('/prepare', upload.single('file'), async (req, res, next) => {
       const dest = path.join(UPLOAD_DIR, `${Date.now()}_${v.id}.mp4`)
       ;(async () => {
         try {
-          await ytdlp(['-f', 'mp4/best', '--no-playlist', '-o', dest, sourceUrl])
+          await ytdlp([...cookieArgs(), '-f', 'mp4/best', '--no-playlist', '-o', dest, sourceUrl])
           const info = await probe(dest)
           Object.assign(v, { path: dest, ...info, ready: true, title: title || v.title })
         } catch (e) {
@@ -110,7 +139,7 @@ downloaderRouter.post('/list', async (req, res, next) => {
   const url = (req.body?.url as string || '').trim()
   if (!url) return res.status(400).json({ error: 'Informe um link' })
   try {
-    const out = await ytdlp(['--flat-playlist', '--dump-single-json', '--no-warnings', url], 60_000)
+    const out = await ytdlp([...cookieArgs(), '--flat-playlist', '--dump-single-json', '--no-warnings', url], 60_000)
     const j = JSON.parse(out)
     const entries: any[] = j.entries || [j]
     const videos = entries.filter(Boolean).map((e) => ({

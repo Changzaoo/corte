@@ -14,7 +14,12 @@ declare global {
 
 function bearer(req: Request): string | null {
   const h = req.get('authorization') || ''
-  return h.startsWith('Bearer ') ? h.slice(7).trim() : null
+  if (h.startsWith('Bearer ')) return h.slice(7).trim()
+  // Fallback for media loaded via <video src>/<a href> (browsers can't send
+  // an Authorization header on those): accept the idToken as a query param.
+  const q = req.query?.token
+  if (typeof q === 'string' && q) return q.trim()
+  return null
 }
 
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
