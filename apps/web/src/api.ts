@@ -87,6 +87,9 @@ export interface AdminOverview {
   recentLogins: LoginEvent[]
   usersByOs: { name: string; count: number }[]
   loginsByDay: { date: string; count: number }[]
+  activityByHour: { hour: number; cuts: number; sessions: number }[]
+  peakHourByUse: number | null
+  peakHourByCuts: number | null
 }
 export interface RenderStats {
   totalCuts: number; renders: number

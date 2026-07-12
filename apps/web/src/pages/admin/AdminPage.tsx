@@ -440,6 +440,36 @@ export default function AdminPage() {
         </div>
       </div>
 
+      {/* atividade por hora (todos os usuários) */}
+      {(() => {
+        const byHour = overview?.activityByHour ?? []
+        const maxUse = Math.max(1, ...byHour.map((h) => h.cuts + h.sessions))
+        const fmtH = (h: number | null | undefined) => (h == null ? '—' : `${String(h).padStart(2, '0')}h`)
+        return (
+          <div className="mt-md rounded-xl border border-slate-800 bg-slate-925 p-lg">
+            <div className="mb-sm flex flex-wrap items-center gap-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Atividade por hora — todos os usuários</p>
+              <span className="ml-auto flex items-center gap-xs text-xs text-slate-400">
+                <Clock className="h-3.5 w-3.5 text-primary-400" /> Pico às <span className="font-semibold text-primary-300">{fmtH(overview?.peakHourByUse)}</span>
+              </span>
+            </div>
+            <div className="flex h-32 items-end gap-[3px]">
+              {byHour.map((h) => (
+                <div key={h.hour} className="flex-1" title={`${h.hour}h — ${h.cuts} corte(s), ${h.sessions} login(s)`}>
+                  <div className="flex h-full flex-col justify-end">
+                    <div className="w-full rounded-t bg-primary-500" style={{ height: `${((h.cuts + h.sessions) / maxUse) * 100}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-[2px] flex justify-between text-[10px] text-slate-600">
+              <span>0h</span><span>6h</span><span>12h</span><span>18h</span><span>23h</span>
+            </div>
+            <p className="mt-xs text-[11px] text-slate-500">Barras = cortes + logins por hora, somando todos os dias e usuários. Pico de cortes às <span className="text-slate-300">{fmtH(overview?.peakHourByCuts)}</span>.</p>
+          </div>
+        )
+      })()}
+
       {/* recent logins */}
       <div className="mt-md rounded-xl border border-slate-800 bg-slate-925 p-lg">
         <p className="mb-sm text-xs font-semibold uppercase tracking-wide text-slate-500">Logins recentes (IP · SO · local)</p>

@@ -312,11 +312,13 @@ export async function buildOverview() {
   let logins24h = 0, failed24h = 0
   const osCount = new Map<string, number>()
   const byDay = new Map<string, number>()
+  // atividade agregada de TODOS os usuários por hora do dia
+  const byHourAll = Array.from({ length: 24 }, (_, hour) => ({ hour, cuts: 0, sessions: 0 }))
   try {
-    const snap = await db.collection('user_login_events').orderBy('loginAt', 'desc').limit(500).get()
+    const snap = await db.collection('user_login_events').orderBy('loginAt', 'desc').limit(2000).get()
     snap.forEach((d) => {
       const e = d.data()
-      const t = new Date(e.loginAt).getTime()
+      const dt = new Date(e.loginAt); const t = dt.getTime()
       if (recentLogins.length < 40) recentLogins.push({
         id: d.id, loginAt: e.loginAt, ip: e.ip, os: e.os, browser: e.browser, deviceType: e.deviceType,
         location: e.location, country: e.country, success: e.success !== false,
@@ -326,7 +328,18 @@ export async function buildOverview() {
         osCount.set(e.os || '—', (osCount.get(e.os || '—') || 0) + 1)
         const day = (e.loginAt || '').slice(0, 10)
         if (day) byDay.set(day, (byDay.get(day) || 0) + 1)
+        if (!Number.isNaN(t)) byHourAll[dt.getHours()].sessions += 1
       }
+    })
+  } catch { /* firestore disabled */ }
+
+  // cortes de todos os usuários por hora do dia
+  try {
+    const snap = await db.collection('render_events').limit(5000).get()
+    snap.forEach((d) => {
+      const e = d.data(); if (!e.at) return
+      const dt = new Date(e.at)
+      if (!Number.isNaN(dt.getTime())) byHourAll[dt.getHours()].cuts += e.count || 0
     })
   } catch { /* firestore disabled */ }
 
@@ -345,6 +358,9 @@ export async function buildOverview() {
     return { date: d, count: byDay.get(d) || 0 }
   })
 
+  const peakByUse = byHourAll.reduce((mx, x) => ((x.cuts + x.sessions) > (mx.cuts + mx.sessions) ? x : mx), byHourAll[0])
+  const peakByCuts = byHourAll.reduce((mx, x) => (x.cuts > mx.cuts ? x : mx), byHourAll[0])
+
   return {
     stats: {
       totalUsers: users.length,
@@ -354,5 +370,8 @@ export async function buildOverview() {
       totalCuts: users.reduce((sum, u) => sum + (u.cutsTotal || 0), 0),
     },
     recentLogins, usersByOs, loginsByDay: last7,
+    activityByHour: byHourAll,
+    peakHourByUse: (peakByUse.cuts + peakByUse.sessions) > 0 ? peakByUse.hour : null,
+    peakHourByCuts: peakByCuts.cuts > 0 ? peakByCuts.hour : null,
   }
 }
