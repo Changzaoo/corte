@@ -1,7 +1,35 @@
 import { auth } from './firebase'
 import { getDeviceId, getDeviceName } from './device'
 
-const API_URL = (import.meta.env.VITE_API_URL as string) || 'http://localhost:4000'
+// Base da API. Se o backend local (instalado no PC do usuário) estiver de pé,
+// tudo passa a rodar nele — download, render e entrega no próprio computador.
+const CLOUD_API = (import.meta.env.VITE_API_URL as string) || 'http://localhost:4000'
+const LOCAL_API = 'http://localhost:4000'
+let apiBase = CLOUD_API
+let baseProbe: Promise<string> | null = null
+
+async function resolveBase(): Promise<string> {
+  if (baseProbe) return baseProbe
+  baseProbe = (async () => {
+    if (CLOUD_API === LOCAL_API) { apiBase = LOCAL_API; return apiBase }
+    try {
+      const ctrl = new AbortController()
+      const t = setTimeout(() => ctrl.abort(), 1200)
+      const r = await fetch(`${LOCAL_API}/health`, { signal: ctrl.signal })
+      clearTimeout(t)
+      if (r.ok) { apiBase = LOCAL_API; return apiBase }
+    } catch { /* sem backend local — usa a nuvem */ }
+    apiBase = CLOUD_API
+    return apiBase
+  })()
+  return baseProbe
+}
+/** URL base atual (já resolvida após a 1ª chamada). */
+const API_URL = () => apiBase
+/** true quando o app está rodando contra o backend instalado no PC. */
+export const isLocalBackend = () => apiBase === LOCAL_API && CLOUD_API !== LOCAL_API
+/** Re-testa o backend local (ex.: após instalar). */
+export const recheckBackend = () => { baseProbe = null; return resolveBase() }
 
 // ---- shared types (subset of the down app + admin) -------------------------
 export interface PreparedVideo { video_id: number; stream_url: string; ready: boolean; title: string }
@@ -86,9 +114,10 @@ async function authHeaders(): Promise<Record<string, string>> {
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const base = await resolveBase()
   const headers = await authHeaders()
   headers['Content-Type'] = 'application/json'
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetch(`${base}${path}`, {
     method, headers, body: body ? JSON.stringify(body) : undefined,
   })
   if (!res.ok) {
@@ -100,8 +129,9 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 }
 
 async function upload<T>(path: string, fd: FormData): Promise<T> {
+  const base = await resolveBase()
   const headers = await authHeaders()
-  const res = await fetch(`${API_URL}${path}`, { method: 'POST', headers, body: fd })
+  const res = await fetch(`${base}${path}`, { method: 'POST', headers, body: fd })
   if (!res.ok) {
     const e = await res.json().catch(() => ({ detail: 'Erro' }))
     throw new Error(e.detail || `HTTP ${res.status}`)
@@ -141,7 +171,7 @@ export const api = {
   },
   getVideoInfo: (id: number) => request<VideoInfo>('GET', `/api/videos/${id}`),
   streamUrl: (id: number, token?: string) =>
-    `${API_URL}/api/videos/${id}/stream${token ? `?token=${encodeURIComponent(token)}` : ''}`,
+    `${API_URL()}/api/videos/${id}/stream${token ? `?token=${encodeURIComponent(token)}` : ''}`,
   listProfileVideos: (url: string) => request<ProfileVideos>('POST', '/api/downloader/list', { url }),
 
   // current Firebase idToken — needed to authenticate media loaded via
@@ -154,12 +184,12 @@ export const api = {
   getJob: (id: number) => request<JobStatus>('GET', `/api/jobs/${id}`),
   listClips: (jobId: number) => request<Clip[]>('GET', `/api/clips?job_id=${jobId}`),
   downloadClip: (id: number, token?: string) =>
-    `${API_URL}/api/clips/${id}/download${token ? `?token=${encodeURIComponent(token)}` : ''}`,
+    `${API_URL()}/api/clips/${id}/download${token ? `?token=${encodeURIComponent(token)}` : ''}`,
   downloadAllUrl: (jobId: number, token?: string, ids?: number[]) => {
     const qs = new URLSearchParams({ job_id: String(jobId) })
     if (ids && ids.length) qs.set('ids', ids.join(','))
     if (token) qs.set('token', token)
-    return `${API_URL}/api/clips/download-all?${qs.toString()}`
+    return `${API_URL()}/api/clips/download-all?${qs.toString()}`
   },
 
   // ---- tweet template ------------------------------------------------------
@@ -168,7 +198,7 @@ export const api = {
     fd.append('file', file)
     return upload<{ avatar_id: string }>('/api/tweet/avatar', fd)
   },
-  tweetAvatarUrl: (avatarId: string) => `${API_URL}/api/tweet/avatar/${encodeURIComponent(avatarId)}`,
+  tweetAvatarUrl: (avatarId: string) => `${API_URL()}/api/tweet/avatar/${encodeURIComponent(avatarId)}`,
   tweetSaveLocation: () => request<{ folder: string; pattern: string }>('GET', '/api/tweet/save-location'),
   tweetRender: (data: {
     items: { video_id: number; caption: string; card_mode?: 'auto' | 'card' | 'reskin' }[]
@@ -180,9 +210,10 @@ export const api = {
     profile: { name: string; handle: string; verified: boolean; avatar_id: string | null }
     style: { bg: string; card: 'light' | 'dark'; hook?: string }
   }): Promise<string> => {
+    const base = await resolveBase()
     const headers = await authHeaders()
     headers['Content-Type'] = 'application/json'
-    const res = await fetch(`${API_URL}/api/tweet/preview`, {
+    const res = await fetch(`${base}/api/tweet/preview`, {
       method: 'POST', headers, body: JSON.stringify(data),
     })
     if (!res.ok) {

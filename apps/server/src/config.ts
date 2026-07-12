@@ -7,6 +7,11 @@ export const config = {
   port: Number(process.env.PORT || 4000),
   nodeEnv: process.env.NODE_ENV || 'development',
 
+  // LOCAL_MODE: backend rodando na maquina do proprio usuario. Pula a
+  // verificacao do Firebase (nao precisa de service account) e trata o usuario
+  // local como dono/admin. O pipeline de download/render/entrega roda 100% local.
+  localMode: bool(process.env.LOCAL_MODE, false),
+
   // CORS: comma-separated allowlist of web origins. '*' allows all (dev).
   corsOrigins: (process.env.CORS_ORIGINS || '*')
     .split(',').map((s) => s.trim()).filter(Boolean),

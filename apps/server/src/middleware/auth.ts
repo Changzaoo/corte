@@ -1,9 +1,20 @@
 import type { Request, Response, NextFunction } from 'express'
 import type { UserRecord } from 'firebase-admin/auth'
 import { authAdmin, db } from '../firebase.js'
+import { config } from '../config.js'
 import { roleForUser, type Role } from '../services/sessions.js'
 
 export interface AuthUser { uid: string; email: string | null; role: Role; record: UserRecord }
+
+// Usuario sintetico quando o backend roda na maquina do proprio dono (LOCAL_MODE).
+const LOCAL_USER: AuthUser = {
+  uid: 'local', email: 'local@corte', role: 'admin',
+  record: {
+    uid: 'local', email: 'local@corte', displayName: 'Você (local)', photoURL: undefined,
+    disabled: false, emailVerified: true, metadata: { creationTime: '', lastSignInTime: '' },
+    providerData: [], toJSON: () => ({}),
+  } as unknown as UserRecord,
+}
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -23,6 +34,8 @@ function bearer(req: Request): string | null {
 }
 
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
+  // Modo local: o dono roda tudo na propria maquina — sem Firebase.
+  if (config.localMode) { res.locals.user = LOCAL_USER; return next() }
   const token = bearer(req)
   if (!token) return res.status(401).json({ error: 'Não autenticado' })
   try {

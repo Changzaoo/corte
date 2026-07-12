@@ -2,6 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { Shield, LogOut, Sparkles } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useAuth } from '../AuthContext'
+import BackendStatus from './BackendStatus'
 
 export default function Layout({ children }: { children: ReactNode }) {
   const { profile, isAdmin, logout } = useAuth()
@@ -22,6 +23,7 @@ export default function Layout({ children }: { children: ReactNode }) {
 
           {/* right cluster */}
           <div className="ml-auto flex items-center gap-xs sm:gap-sm">
+            <BackendStatus />
             {isAdmin && (
               <NavLink to="/admin" title="Painel de administração" className={({ isActive }) =>
                 `flex items-center gap-xs rounded-full border px-md py-xs text-xs font-semibold transition-colors ${
