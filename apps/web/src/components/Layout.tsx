@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { MessageSquare, Shield, LogOut, Sparkles } from 'lucide-react'
+import { Shield, LogOut, Sparkles } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useAuth } from '../AuthContext'
 
@@ -20,20 +20,14 @@ export default function Layout({ children }: { children: ReactNode }) {
             <span className="text-lg font-bold text-slate-50">Corte</span>
           </button>
 
-          {/* active section pill (só Template) */}
-          <NavLink to="/criar/template"
-            className="ml-sm hidden items-center gap-xs rounded-full bg-primary-500/10 px-md py-xs text-sm font-semibold text-primary-300 sm:flex">
-            <MessageSquare className="h-4 w-4" /> Template
-          </NavLink>
-
           {/* right cluster */}
           <div className="ml-auto flex items-center gap-xs sm:gap-sm">
             {isAdmin && (
-              <NavLink to="/admin" title="Painel admin" className={({ isActive }) =>
-                `flex h-9 w-9 items-center justify-center rounded-full border transition-colors sm:h-auto sm:w-auto sm:gap-xs sm:px-md sm:py-xs sm:text-xs sm:font-semibold ${
+              <NavLink to="/admin" title="Painel de administração" className={({ isActive }) =>
+                `flex items-center gap-xs rounded-full border px-md py-xs text-xs font-semibold transition-colors ${
                   isActive ? 'border-primary-500 bg-primary-500/10 text-primary-300'
                   : 'border-slate-800 text-slate-300 hover:bg-slate-100/10'}`}>
-                <Shield className="h-4 w-4 sm:h-3.5 sm:w-3.5" /> <span className="hidden sm:inline">Admin</span>
+                <Shield className="h-3.5 w-3.5" /> Admin
               </NavLink>
             )}
             <div className="flex items-center gap-xs rounded-full border border-slate-850 bg-slate-850 py-[3px] pl-[3px] pr-xs sm:pr-sm">

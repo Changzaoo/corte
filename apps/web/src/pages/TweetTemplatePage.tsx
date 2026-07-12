@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  AlertCircle, BadgeCheck, CheckCircle2, Download, Link2, Loader2, MessageSquare,
+  AlertCircle, BadgeCheck, CheckCircle2, Download, Link2, Loader2,
   Package, Play, RotateCcw, Save, Search, ShieldCheck, Trash2, Upload, UserPlus, X,
 } from 'lucide-react'
 import { api, type Clip, type JobStatus, type ProfileVideo } from '../api'
@@ -449,15 +449,6 @@ export default function TweetTemplatePage() {
   // ================================ EDITOR =======================================
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="shrink-0 border-b border-slate-800 px-lg py-md">
-        <h2 className="flex items-center gap-sm text-lg font-bold text-slate-50">
-          <MessageSquare className="w-5 h-5 text-primary-400" /> Template Tweet
-        </h2>
-        <p className="mt-xs text-xs text-slate-400">
-          Seu vídeo dentro de um post estilo X/Twitter — avatar, nome, @ e legenda editáveis. Um vídeo ou vários de uma vez.
-        </p>
-      </div>
-
       <div className="flex flex-1 min-h-0 flex-col gap-lg overflow-y-auto px-lg py-md lg:flex-row lg:overflow-hidden">
         {/* preview REAL */}
         <div className="flex shrink-0 flex-col items-center gap-xs lg:w-[300px]">
