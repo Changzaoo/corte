@@ -5,35 +5,51 @@ import { getDeviceId, getDeviceName } from './device'
 // tudo passa a rodar nele — download, render e entrega no próprio computador.
 const CLOUD_API = (import.meta.env.VITE_API_URL as string) || 'http://localhost:4000'
 const LOCAL_API = 'http://localhost:4000'
-let apiBase = CLOUD_API
-let baseProbe: Promise<string> | null = null
+const cloudIsLocal = CLOUD_API === LOCAL_API
+
+// Estado ÚNICO e compartilhado (evita corrida entre componentes que checavam o
+// backend em paralelo e discordavam — header dizia "No seu PC" e o gate pedia
+// instalar). Uma sonda por vez, com throttle.
+let apiBase = cloudIsLocal ? LOCAL_API : CLOUD_API
+let localUp = cloudIsLocal
+let lastProbe = 0
+let probing: Promise<void> | null = null
+
+async function probeLocal(): Promise<void> {
+  if (cloudIsLocal) { localUp = true; apiBase = LOCAL_API; return }
+  try {
+    const ctrl = new AbortController()
+    const t = setTimeout(() => ctrl.abort(), 1500)
+    const r = await fetch(`${LOCAL_API}/health`, { signal: ctrl.signal })
+    clearTimeout(t)
+    const j = r.ok ? await r.json().catch(() => ({} as { app?: string })) : {}
+    localUp = (j as { app?: string })?.app === 'cortes.digital'
+  } catch { localUp = false }
+  apiBase = localUp ? LOCAL_API : CLOUD_API
+}
 
 async function resolveBase(): Promise<string> {
-  if (baseProbe) return baseProbe
-  baseProbe = (async () => {
-    if (CLOUD_API === LOCAL_API) { apiBase = LOCAL_API; return apiBase }
-    try {
-      const ctrl = new AbortController()
-      const t = setTimeout(() => ctrl.abort(), 1200)
-      const r = await fetch(`${LOCAL_API}/health`, { signal: ctrl.signal })
-      clearTimeout(t)
-      if (r.ok) {
-        const j = await r.json().catch(() => ({} as { app?: string }))
-        // confirma que é MESMO o backend do cortes.digital (não outro app na 4000)
-        if (j?.app === 'cortes.digital') { apiBase = LOCAL_API; return apiBase }
-      }
-    } catch { /* sem backend local — usa a nuvem */ }
-    apiBase = CLOUD_API
-    return apiBase
-  })()
-  return baseProbe
+  const now = Date.now()
+  if (!probing && now - lastProbe > 3000) { lastProbe = now; probing = probeLocal().finally(() => { probing = null }) }
+  if (probing) await probing
+  return apiBase
 }
-/** URL base atual (já resolvida após a 1ª chamada). */
 const API_URL = () => apiBase
 /** true quando o app está rodando contra o backend instalado no PC. */
-export const isLocalBackend = () => apiBase === LOCAL_API && CLOUD_API !== LOCAL_API
-/** Re-testa o backend local (ex.: após instalar). */
-export const recheckBackend = () => { baseProbe = null; return resolveBase() }
+export const isLocalBackend = () => localUp && !cloudIsLocal
+/** Re-testa o backend local AGORA (ex.: após instalar). */
+export const recheckBackend = async () => { lastProbe = 0; await resolveBase(); return isLocalBackend() }
+
+// Roteamento duplo: login/admin SEMPRE na nuvem (é lá que está o Firestore com
+// os dados de usuários/analytics). O resto (download/render/entrega) roda no
+// backend local quando ele existe. Sem isso, o admin dá 500 no backend local
+// (que não tem credenciais do Firebase).
+const CLOUD_ONLY = ['/api/admin', '/api/me']
+const isCloudOnly = (p: string) => CLOUD_ONLY.some((c) => p.startsWith(c))
+async function baseFor(path: string): Promise<string> {
+  if (isCloudOnly(path)) return CLOUD_API
+  return resolveBase()
+}
 
 // ---- shared types (subset of the down app + admin) -------------------------
 export interface PreparedVideo { video_id: number; stream_url: string; ready: boolean; title: string }
@@ -128,7 +144,7 @@ async function authHeaders(): Promise<Record<string, string>> {
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const base = await resolveBase()
+  const base = await baseFor(path)
   const headers = await authHeaders()
   headers['Content-Type'] = 'application/json'
   const res = await fetch(`${base}${path}`, {
@@ -143,7 +159,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 }
 
 async function upload<T>(path: string, fd: FormData): Promise<T> {
-  const base = await resolveBase()
+  const base = await baseFor(path)
   const headers = await authHeaders()
   const res = await fetch(`${base}${path}`, { method: 'POST', headers, body: fd })
   if (!res.ok) {
@@ -203,6 +219,10 @@ export const api = {
   listClips: (jobId: number) => request<Clip[]>('GET', `/api/clips?job_id=${jobId}`),
   downloadClip: (id: number, token?: string) =>
     `${API_URL()}/api/clips/${id}/download${token ? `?token=${encodeURIComponent(token)}` : ''}`,
+  openClipsFolder: () => request<{ ok: boolean; folder: string }>('POST', '/api/clips/open-folder'),
+  clipsLibrary: () => request<{ folder: string; count: number; items: { name: string; size: number; mtime: number }[] }>('GET', '/api/clips/library'),
+  clipFileUrl: (name: string, token?: string) =>
+    `${API_URL()}/api/clips/file/${encodeURIComponent(name)}${token ? `?token=${encodeURIComponent(token)}` : ''}`,
   downloadAllUrl: (jobId: number, token?: string, ids?: number[]) => {
     const qs = new URLSearchParams({ job_id: String(jobId) })
     if (ids && ids.length) qs.set('ids', ids.join(','))

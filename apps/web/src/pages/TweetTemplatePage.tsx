@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  AlertCircle, BadgeCheck, CheckCircle2, Download, Link2, Loader2,
+  AlertCircle, BadgeCheck, CheckCircle2, Download, FolderOpen, Link2, Loader2,
   Package, Play, RotateCcw, Save, Search, ShieldCheck, Trash2, Upload, UserPlus, X,
 } from 'lucide-react'
-import { api, type Clip, type JobStatus, type ProfileVideo } from '../api'
+import { api, isLocalBackend, type Clip, type JobStatus, type ProfileVideo } from '../api'
 import { Button, ClearableInput, useContextMenu } from '../components/ui'
-import LiveRendersPanel from '../components/LiveRenders'
 import InstagramConnect from '../components/InstagramConnect'
 
 type CardTheme = 'light' | 'dark'
@@ -419,25 +418,33 @@ export default function TweetTemplatePage() {
 
   // ================================ RESULTS ======================================
   if (jobId) {
+    const rendering = !!job && job.status !== 'done' && job.status !== 'failed'
     return (
-      <div className="flex h-full flex-col px-lg py-md">
-        <div className="shrink-0 border-b border-slate-800 pb-md">
+      <div className="flex h-full flex-col overflow-hidden px-lg py-sm">
+        <div className="shrink-0 border-b border-slate-800 pb-sm">
           <div className="flex flex-wrap items-center gap-sm">
             {job?.status === 'done' ? (
-              <span className="flex items-center gap-xs text-sm font-semibold text-success-300"><CheckCircle2 className="h-4 w-4" /> Concluído — {clips.length} vídeo(s) prontos</span>
+              <span className="flex items-center gap-xs text-sm font-semibold text-success-300"><CheckCircle2 className="h-4 w-4" /> Concluído — {clips.length} vídeo(s)</span>
             ) : job?.status === 'failed' ? (
               <span className="flex items-center gap-xs text-sm font-semibold text-error-300"><AlertCircle className="h-4 w-4" /> Falhou</span>
             ) : (
               <span className="flex items-center gap-xs text-sm text-slate-300"><Loader2 className="h-4 w-4 animate-spin" /> {job?.stage_detail || 'Gerando…'}{job?.progress ? ` (${Math.round(job.progress)}%)` : ''}</span>
             )}
+            {clips.length > 0 && <span className="text-xs text-slate-500">· {clips.length} pronto(s)</span>}
             <div className="ml-auto flex flex-wrap items-center gap-xs">
               {clips.length > 0 && (
                 <>
                   <Button variant="ghost" size="sm"
                     onClick={() => setSelectedClips(prev =>
                       prev.size === clips.length ? new Set() : new Set(clips.map(c => c.id)))}>
-                    {selectedClips.size === clips.length && clips.length > 0 ? 'Limpar seleção' : 'Selecionar todos'}
+                    {selectedClips.size === clips.length && clips.length > 0 ? 'Limpar' : 'Selecionar todos'}
                   </Button>
+                  {isLocalBackend() && (
+                    <button onClick={() => api.openClipsFolder().catch(() => {})}
+                      className="inline-flex items-center gap-xs rounded-md border border-slate-700 px-md py-xs text-xs text-slate-300 hover:bg-slate-800">
+                      <FolderOpen className="h-3.5 w-3.5" /> Abrir pasta
+                    </button>
+                  )}
                   <a href={api.downloadAllUrl(jobId, mediaToken ?? undefined)}
                     className="inline-flex items-center gap-xs rounded-md border border-slate-700 px-md py-xs text-xs text-slate-300 hover:bg-slate-800">
                     <Package className="w-3 h-3" /> Baixar todos (.zip)
@@ -445,7 +452,7 @@ export default function TweetTemplatePage() {
                   {selectedClips.size > 0 && (
                     <a href={api.downloadAllUrl(jobId, mediaToken ?? undefined, [...selectedClips])}
                       className="inline-flex items-center gap-xs rounded-md border border-primary-500/50 bg-primary-500/10 px-md py-xs text-xs text-primary-200 hover:bg-primary-500/20">
-                      <Package className="w-3 h-3" /> Baixar {selectedClips.size} selecionado(s) (.zip)
+                      <Package className="w-3 h-3" /> Baixar {selectedClips.size} (.zip)
                     </a>
                   )}
                 </>
@@ -456,53 +463,46 @@ export default function TweetTemplatePage() {
               }}><RotateCcw className="w-3 h-3" /> Voltar</Button>
             </div>
           </div>
-          {job && job.status !== 'done' && job.status !== 'failed' && (
-            <div className="mt-sm h-1 w-full overflow-hidden rounded-full bg-slate-800">
-              <div className="h-full bg-primary-500 transition-all" style={{ width: `${job.progress || 0}%` }} />
+          {rendering && (
+            <div className="mt-xs h-1 w-full overflow-hidden rounded-full bg-slate-800">
+              <div className="h-full bg-primary-500 transition-all" style={{ width: `${job!.progress || 0}%` }} />
             </div>
           )}
-          {error && <p className="mt-sm text-xs text-error-300">{error}</p>}
+          {error && <p className="mt-xs text-xs text-error-300">{error}</p>}
         </div>
-        <div className="mt-md flex-1 min-h-0 space-y-md overflow-y-auto">
-          {job && job.status !== 'done' && job.status !== 'failed' && (
-            <div className="mx-auto max-w-md">
-              <p className="mb-sm text-center text-xs text-slate-500">Renderizando…</p>
-              <LiveRendersPanel filter={`tweet-${jobId}`} large emptyText="Preparando…" />
-            </div>
-          )}
+
+        {/* grade de cortes — contida no viewport (sem scroll de página) */}
+        <div className="min-h-0 flex-1 overflow-y-auto pt-sm">
           {clips.length === 0 ? (
-            job?.status === 'failed'
-              ? <div className="flex h-full items-center justify-center text-sm text-slate-500">Nada foi gerado.</div>
-              : null
+            <div className="flex h-full flex-col items-center justify-center gap-sm text-sm text-slate-500">
+              {job?.status === 'failed'
+                ? 'Nada foi gerado.'
+                : <><Loader2 className="h-6 w-6 animate-spin text-primary-400" /> Renderizando os cortes…</>}
+            </div>
           ) : (
-            <div>
-              {job && job.status !== 'done' && job.status !== 'failed' && (
-                <p className="mb-sm text-[11px] font-semibold uppercase tracking-wide text-slate-500">Prontos ({clips.length})</p>
-              )}
-              <div className="grid grid-cols-2 gap-md sm:grid-cols-3 md:grid-cols-4">
-                {clips.map(c => {
-                  const sel = selectedClips.has(c.id)
-                  return (
+            <div className="grid grid-cols-3 gap-sm sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7">
+              {clips.map(c => {
+                const sel = selectedClips.has(c.id)
+                return (
                   <div key={c.id} className={`overflow-hidden rounded-lg border bg-slate-900 ${sel ? 'border-primary-500' : 'border-slate-800'}`}>
                     <div className="relative">
-                      <video src={api.downloadClip(c.id, mediaToken ?? undefined)} controls preload="metadata" className="aspect-[9/16] w-full bg-black object-contain" />
+                      <video src={api.downloadClip(c.id, mediaToken ?? undefined)} controls preload="metadata" className="aspect-[9/16] max-h-[42vh] w-full bg-black object-contain" />
                       <button type="button" title={sel ? 'Desmarcar' : 'Selecionar'}
                         onClick={() => setSelectedClips(prev => { const n = new Set(prev); n.has(c.id) ? n.delete(c.id) : n.add(c.id); return n })}
-                        className={`absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded-full border-2 text-xs font-bold transition-colors ${sel ? 'border-primary-500 bg-primary-500 text-white' : 'border-white/70 bg-black/50 text-transparent hover:border-white'}`}>
+                        className={`absolute left-1 top-1 flex h-5 w-5 items-center justify-center rounded-full border-2 text-[10px] font-bold transition-colors ${sel ? 'border-primary-500 bg-primary-500 text-white' : 'border-white/70 bg-black/50 text-transparent hover:border-white'}`}>
                         ✓
                       </button>
                     </div>
-                    <div className="flex items-center gap-xs p-sm">
-                      <span className="flex-1 truncate text-xs text-slate-300">{c.topic_label || c.title || `Vídeo ${c.id}`}</span>
+                    <div className="flex items-center gap-xs px-xs py-[3px]">
+                      <span className="flex-1 truncate text-[10px] text-slate-400">{c.topic_label || c.title || `Vídeo ${c.id}`}</span>
                       <a href={api.downloadClip(c.id, mediaToken ?? undefined)} download title="Baixar"
-                        className="rounded p-xs text-slate-400 hover:bg-slate-800 hover:text-slate-200">
-                        <Download className="h-3.5 w-3.5" />
+                        className="rounded p-[2px] text-slate-400 hover:bg-slate-800 hover:text-slate-200">
+                        <Download className="h-3 w-3" />
                       </a>
                     </div>
                   </div>
-                  )
-                })}
-              </div>
+                )
+              })}
             </div>
           )}
         </div>
