@@ -65,7 +65,7 @@ export default function LoginPage() {
     <div className="flex h-screen w-full items-center justify-center bg-slate-950 px-lg">
       <div className="w-full max-w-[400px]">
         <div className="mb-xl flex flex-col items-center gap-sm text-center">
-          <img src="/logo-mark.png" alt="" className="h-16 w-16 rounded-2xl" />
+          <img src="/logo-mark.png?v=2" alt="" className="h-16 w-16 rounded-2xl" />
           <h1 className="text-2xl font-bold text-slate-50">cortes.digital</h1>
           <p className="text-sm text-slate-400">
             {mode === 'login' ? 'Entre para montar seus cortes no template do X.' : 'Crie sua conta para começar.'}

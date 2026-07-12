@@ -17,7 +17,11 @@ async function resolveBase(): Promise<string> {
       const t = setTimeout(() => ctrl.abort(), 1200)
       const r = await fetch(`${LOCAL_API}/health`, { signal: ctrl.signal })
       clearTimeout(t)
-      if (r.ok) { apiBase = LOCAL_API; return apiBase }
+      if (r.ok) {
+        const j = await r.json().catch(() => ({} as { app?: string }))
+        // confirma que é MESMO o backend do cortes.digital (não outro app na 4000)
+        if (j?.app === 'cortes.digital') { apiBase = LOCAL_API; return apiBase }
+      }
     } catch { /* sem backend local — usa a nuvem */ }
     apiBase = CLOUD_API
     return apiBase

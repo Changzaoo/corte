@@ -3,6 +3,7 @@ import { AuthProvider } from './AuthContext'
 import { ContextMenuProvider } from './components/ui'
 import { ProtectedRoute, AdminRoute } from './components/ProtectedRoute'
 import Layout from './components/Layout'
+import RequireLocalBackend from './components/RequireLocalBackend'
 import LoginPage from './pages/LoginPage'
 import TweetTemplatePage from './pages/TweetTemplatePage'
 import AdminPage from './pages/admin/AdminPage'
@@ -23,7 +24,7 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<LoginPage />} />
 
-            <Route path="/criar/template" element={<AppShell><TweetTemplatePage /></AppShell>} />
+            <Route path="/criar/template" element={<AppShell><RequireLocalBackend><TweetTemplatePage /></RequireLocalBackend></AppShell>} />
 
             <Route path="/admin" element={
               <AdminRoute><Layout><AdminPage /></Layout></AdminRoute>

@@ -15,7 +15,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         <div className="flex items-center gap-sm px-md py-sm sm:px-lg">
           {/* brand */}
           <button onClick={() => navigate('/criar/template')} className="flex items-center gap-xs">
-            <img src="/logo-mark.png" alt="" className="h-9 w-9 rounded-lg" />
+            <img src="/logo-mark.png?v=2" alt="" className="h-9 w-9 rounded-lg" />
             <span className="text-lg font-bold text-slate-50">cortes.digital</span>
           </button>
 

@@ -11,7 +11,7 @@ AppId={{9E5C8B21-CORTE-4F2A-9A11-C0RTE0000001}
 AppName={#AppName}
 AppVersion={#AppVer}
 AppPublisher=cortes.digital
-DefaultDirName={localappdata}\Corte
+DefaultDirName={localappdata}\cortes.digital
 DisableProgramGroupPage=yes
 DisableDirPage=yes
 LicenseFile=terms.txt
@@ -20,12 +20,19 @@ OutputBaseFilename=cortes-digital-Setup
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
+; visual todo preto (cor de fundo do icone) com a logo azul
+SetupIconFile=app.ico
+WizardImageFile=wizard.bmp
+WizardSmallImageFile=wizard-small.bmp
+WizardImageStretch=yes
+WizardImageAlphaFormat=none
 PrivilegesRequired=lowest
 ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayName={#AppName}
+UninstallDisplayIcon={app}\apps\web\public\favicon.ico
 VersionInfoVersion={#AppVer}
 VersionInfoCompany=cortes.digital
-VersionInfoDescription=Instalador do Corte
+VersionInfoDescription=Instalador do cortes.digital
 VersionInfoProductName={#AppName}
 
 [Languages]

@@ -46,7 +46,9 @@ app.use(express.json({ limit: '2mb' }))
 app.use(rateLimit({ windowMs: 15 * 60_000, max: 1000, standardHeaders: true, legacyHeaders: false }))
 
 app.get('/', (_req, res) => res.json({ ok: true, service: 'corte-api', ts: new Date().toISOString() }))
-app.get('/health', (_req, res) => res.json({ ok: true }))
+// 'app' marca que é o backend do cortes.digital (detecção do "instalado no PC");
+// 'local' indica que roda em modo local (na máquina do usuário).
+app.get('/health', (_req, res) => res.json({ ok: true, app: 'cortes.digital', local: config.localMode }))
 
 app.use('/api/me', meRouter)
 app.use('/api/admin', adminRouter)
