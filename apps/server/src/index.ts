@@ -21,6 +21,14 @@ app.use(helmet({
   contentSecurityPolicy: false,
 }))
 
+// Private Network Access (Chrome): sem este header o navegador BLOQUEIA um site
+// público (https://cortes.digital) de acessar o backend local (localhost) — o
+// app cairia no servidor da nuvem. Precisa vir antes do CORS/preflight.
+app.use((_req, res, next) => {
+  res.setHeader('Access-Control-Allow-Private-Network', 'true')
+  next()
+})
+
 const allowAll = config.corsOrigins.includes('*')
 // Origens sempre liberadas (o domínio oficial + previews da Vercel + localhost),
 // independente do CORS_ORIGINS configurado no painel do Render.
