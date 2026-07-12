@@ -543,7 +543,7 @@ export default function TweetTemplatePage() {
         </div>
 
         {/* config + batch */}
-        <div className="flex min-h-0 flex-1 flex-col gap-md lg:overflow-y-auto lg:pr-xs">
+        <div className="flex min-h-0 flex-1 flex-col gap-sm lg:overflow-hidden lg:pr-xs">
           <div className="flex items-center gap-xs rounded-md border border-slate-800 bg-slate-900/50 px-sm py-xs text-[10px] text-slate-400">
             <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-primary-400" />
             <span>Tudo automático — fundo desfocado e card montado sozinho. Você só ajusta o perfil e as legendas.</span>
@@ -640,7 +640,7 @@ export default function TweetTemplatePage() {
           </div>
 
           {/* videos */}
-          <div className="flex min-h-0 flex-col">
+          <div className="flex min-h-0 flex-1 flex-col">
             <div className="mb-xs flex items-center justify-between">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                 Vídeos ({items.length}){importing && <Loader2 className="ml-xs inline h-3 w-3 animate-spin text-amber-400" />}
@@ -743,7 +743,7 @@ export default function TweetTemplatePage() {
               <input type="file" accept="video/*" multiple className="hidden" onChange={(e) => e.target.files?.length && addVideos(e.target.files)} />
             </label>
 
-            <div className="mt-sm space-y-xs">
+            <div className="mt-sm min-h-0 flex-1 space-y-xs overflow-y-auto pr-xs">
               {items.map(it => (
                 <div key={it.key}
                   className={`flex items-start gap-sm rounded-lg border p-sm ${previewKey === it.key ? 'border-primary-500/60 bg-slate-900' : 'border-slate-800 bg-slate-900/60'}`}
