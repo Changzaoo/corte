@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Download, Loader2, RefreshCw, Cpu, ShieldAlert } from 'lucide-react'
+import { Download, Loader2, RefreshCw, ShieldAlert } from 'lucide-react'
 import { isLocalBackend, recheckBackend } from '../api'
 
 /** Exige que o app do cortes.digital esteja INSTALADO e rodando no PC. Sem ele,
@@ -16,7 +16,8 @@ export default function RequireLocalBackend({ children }: { children: ReactNode 
   }
   useEffect(() => {
     void check()
-    const iv = setInterval(async () => { await recheckBackend(); setState(isLocalBackend() ? 'ok' : 'missing') }, 5000)
+    // detecção praticamente em tempo real: verifica de forma silenciosa
+    const iv = setInterval(async () => { await recheckBackend(); setState(isLocalBackend() ? 'ok' : 'missing') }, 1500)
     return () => clearInterval(iv)
   }, [])
 
@@ -54,9 +55,6 @@ export default function RequireLocalBackend({ children }: { children: ReactNode 
           <ShieldAlert className="mt-[1px] h-3.5 w-3.5 shrink-0 text-amber-400" />
           <span>Se o Windows mostrar "app não reconhecido", clique em <span className="text-slate-300">Mais informações → Executar assim mesmo</span>.</span>
         </div>
-        <p className="mt-sm flex items-center justify-center gap-xs text-[10px] text-slate-600">
-          <Cpu className="h-3 w-3" /> verificando o app a cada 5s…
-        </p>
       </div>
     </div>
   )

@@ -33,13 +33,17 @@ switch ($Step) {
     Ensure node   'OpenJS.NodeJS.LTS'
     Ensure yt-dlp 'yt-dlp.yt-dlp'
     Ensure ffmpeg 'Gyan.FFmpeg'
-    # gallery-dl (Instagram) — binario standalone, sem depender de Python
+    # gallery-dl (Instagram) — binario standalone (com retry); fallback via pip
     $bin = Join-Path $AppDir 'apps\server\bin'
     New-Item -ItemType Directory -Force $bin | Out-Null
-    try {
-      Invoke-WebRequest 'https://github.com/mikf/gallery-dl/releases/latest/download/gallery-dl.exe' `
-        -OutFile (Join-Path $bin 'gallery-dl.exe') -UseBasicParsing
-    } catch { Write-Host "aviso: nao consegui baixar o gallery-dl (Instagram)" -ForegroundColor Yellow }
+    $gdl = Join-Path $bin 'gallery-dl.exe'
+    for ($i = 0; $i -lt 3 -and -not (Test-Path $gdl); $i++) {
+      try { Invoke-WebRequest 'https://github.com/mikf/gallery-dl/releases/latest/download/gallery-dl.exe' -OutFile $gdl -UseBasicParsing -TimeoutSec 120 } catch { Start-Sleep 2 }
+    }
+    if (-not (Test-Path $gdl) -and (Get-Command python -ErrorAction SilentlyContinue)) {
+      Write-Host "gallery-dl: instalando via pip..." -ForegroundColor Yellow
+      python -m pip install -U gallery-dl | Out-Null
+    }
   }
   'build' {
     Refresh-Path
@@ -47,6 +51,11 @@ switch ($Step) {
     $browser = Detect-Browser
     $envLines = @('PORT=4000','NODE_ENV=production','LOCAL_MODE=1','CORS_ORIGINS=*')
     if ($browser) { $envLines += "YTDLP_COOKIES_FROM_BROWSER=$browser" }
+    # se o gallery-dl.exe standalone nao veio, usa o do pip (Instagram)
+    if (-not (Test-Path (Join-Path $AppDir 'apps\server\bin\gallery-dl.exe'))) {
+      $gp = (python -c "import shutil;print(shutil.which('gallery-dl') or '')" 2>$null)
+      if ($gp) { $envLines += "GALLERYDL_PATH=$($gp.Trim())" }
+    }
     $envLines | Set-Content -Path (Join-Path $AppDir 'apps\server\.env') -Encoding ascii
     Push-Location $AppDir
     & npm install --no-audit --no-fund

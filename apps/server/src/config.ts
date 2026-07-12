@@ -1,4 +1,14 @@
-import 'dotenv/config'
+import { config as loadEnv } from 'dotenv'
+import { fileURLToPath } from 'node:url'
+import path from 'node:path'
+
+// Carrega o .env de forma robusta, INDEPENDENTE do diretório de trabalho: o app
+// instalado roda com o cwd na raiz, mas o .env fica em apps/server/.env. Tenta o
+// cwd e também apps/server/.env relativo a este arquivo (dev via src e build via dist).
+const _here = path.dirname(fileURLToPath(import.meta.url))
+loadEnv()                                              // <cwd>/.env
+loadEnv({ path: path.resolve(_here, '../../.env') })   // dist/src -> apps/server/.env
+loadEnv({ path: path.resolve(_here, '../.env') })      // src      -> apps/server/.env
 
 const bool = (v: string | undefined, def = false) =>
   v == null ? def : ['1', 'true', 'yes', 'on'].includes(v.toLowerCase())
