@@ -1,0 +1,26 @@
+{
+  "name": "corte",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,web -c blue,green \"npm run dev:server\" \"npm run dev:web\"",
+    "dev:web": "npm --workspace=apps/web run dev",
+    "dev:server": "npm --workspace=apps/server run dev",
+    "build": "npm --workspace=apps/web run build",
+    "build:web": "npm --workspace=apps/web run build",
+    "build:server": "npm --workspace=apps/server run build",
+    "vercel-build": "npm run build:web",
+    "start": "npm --workspace=apps/server run start",
+    "set-admin": "npm --workspace=apps/server run set-admin"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

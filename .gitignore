@@ -1,0 +1,38 @@
+# deps
+node_modules/
+.pnp
+.pnp.js
+
+# builds
+dist/
+build/
+apps/web/dist/
+apps/server/dist/
+
+# env / secrets  (NEVER commit these)
+.env
+.env.local
+.env.*.local
+*.serviceaccount.json
+serviceAccount*.json
+firebase-adminsdk*.json
+
+# vercel / render
+.vercel/
+.render/
+
+# logs
+*.log
+npm-debug.log*
+logs/
+
+# runtime scratch (uploads, rendered clips, tmp media)
+apps/server/.data/
+apps/server/tmp/
+apps/server/uploads/
+
+# editor / os
+.DS_Store
+Thumbs.db
+.idea/
+*.tsbuildinfo

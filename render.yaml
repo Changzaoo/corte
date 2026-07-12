@@ -1,0 +1,32 @@
+# Render Blueprint — backend API (Node/Express + firebase-admin + ffmpeg)
+# Deploy: push this repo to GitHub, then in Render → New → Blueprint → pick repo.
+services:
+  - type: web
+    name: corte-api
+    runtime: node
+    plan: free
+    region: oregon
+    rootDir: .
+    buildCommand: npm install && npm --workspace=apps/server run build
+    startCommand: node apps/server/dist/src/index.js
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "10000"
+      # Set to your Vercel URL after the web app is deployed (comma-separated).
+      - key: CORS_ORIGINS
+        sync: false
+      - key: ADMIN_EMAILS
+        value: perdibitcoin@gmail.com
+      - key: DEVICE_HASH_SECRET
+        generateValue: true
+      - key: FIREBASE_PROJECT_ID
+        value: corte-69134
+      # Paste the base64 of the Firebase service-account JSON (secret).
+      - key: FIREBASE_SERVICE_ACCOUNT_B64
+        sync: false
+      - key: GEO_LOOKUP
+        value: "true"

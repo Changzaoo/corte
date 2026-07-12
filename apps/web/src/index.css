@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root { height: 100%; }
+  html, body {
+    @apply overflow-hidden;
+    color-scheme: dark;
+  }
+  body { @apply bg-slate-950 text-slate-100 antialiased; }
+
+  h1 { @apply text-4xl font-bold tracking-tight text-slate-50; }
+  h2 { @apply text-3xl font-bold tracking-tight text-slate-50; }
+  h3 { @apply text-2xl font-semibold tracking-tight text-slate-100; }
+  h4 { @apply text-xl font-semibold tracking-tight text-slate-100; }
+
+  a { @apply text-primary-400 hover:text-primary-300 transition-colors; }
+
+  * { scrollbar-width: thin; scrollbar-color: #3e4144 transparent; }
+  *::-webkit-scrollbar { width: 10px; height: 10px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb {
+    background: #2f3336; border-radius: 8px;
+    border: 2px solid transparent; background-clip: content-box;
+  }
+  *::-webkit-scrollbar-thumb:hover { background: #3e4144; background-clip: content-box; }
+}
+
+@layer components {
+  .container-app { @apply flex h-screen w-full flex-col overflow-hidden; }
+}
