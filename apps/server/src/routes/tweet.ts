@@ -9,6 +9,17 @@ import { renderTweetPreview, renderTweetVideo, type RenderOpts } from '../render
 import { recordRenderEvent } from '../services/sessions.js'
 
 export const tweetRouter = Router()
+
+// Avatar (imagem) é PÚBLICO: carregado via <img src>, que não manda header de
+// auth — assim a foto do perfil não some ao recarregar a página.
+tweetRouter.get('/avatar/:id', (req, res) => {
+  const p = path.join(AVATAR_DIR, path.basename(req.params.id))
+  if (!fs.existsSync(p)) return res.status(404).end()
+  res.setHeader('Cache-Control', 'public, max-age=86400')
+  res.sendFile(path.resolve(p))
+})
+
+// tudo abaixo exige login (+ aprovação)
 tweetRouter.use(requireAuth, requireApproved)
 
 const storage = multer.diskStorage({
@@ -23,12 +34,6 @@ const upload = multer({ storage, limits: { fileSize: 8 * 1024 * 1024 } })
 tweetRouter.post('/avatar', upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Envie uma imagem' })
   res.json({ avatar_id: req.file.filename })
-})
-
-tweetRouter.get('/avatar/:id', (req, res) => {
-  const p = path.join(AVATAR_DIR, path.basename(req.params.id))
-  if (!fs.existsSync(p)) return res.status(404).end()
-  res.sendFile(path.resolve(p))
 })
 
 tweetRouter.get('/save-location', (_req, res) => {

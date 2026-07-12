@@ -16,6 +16,7 @@ interface VideoItem {
   previewUrl: string | null
   thumb?: string | null
   videoId: number | null
+  pendingId?: number | null   // id do vídeo no servidor enquanto ainda baixa (sobrevive ao reload)
   status?: string | null
   caption: string
   cardMode?: CardMode
@@ -124,8 +125,12 @@ export default function TweetTemplatePage() {
     try {
       const raw = JSON.parse(localStorage.getItem(ITEMS_KEY) || '[]') as VideoItem[]
       return raw
-        .filter(i => i.videoId != null)
-        .map(i => ({ ...i, previewUrl: api.streamUrl(i.videoId!), status: null }))
+        // mantém prontos (videoId) E os que ainda baixavam (pendingId) — o reload
+        // não perde mais o download em andamento.
+        .filter(i => i.videoId != null || i.pendingId != null)
+        .map(i => i.videoId != null
+          ? { ...i, previewUrl: api.streamUrl(i.videoId), status: null }
+          : { ...i, previewUrl: null, status: 'retomando…' })
     } catch { return [] }
   })
   const [previewKey, setPreviewKey] = useState<string | null>(null)
@@ -155,12 +160,11 @@ export default function TweetTemplatePage() {
   const [mediaToken, setMediaToken] = useState<string | null>(null)
   const [selectedClips, setSelectedClips] = useState<Set<number>>(new Set())
   useEffect(() => {
-    if (jobId == null) { setMediaToken(null); setSelectedClips(new Set()); return }
     let alive = true
     api.authToken().then(t => { if (alive) setMediaToken(t) })
     return () => { alive = false }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jobId, clips.length])
+  }, [])
+  useEffect(() => { if (jobId == null) setSelectedClips(new Set()) }, [jobId])
   const [renderedKeys, setRenderedKeys] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem(RENDERED_KEY) || '[]') } catch { return [] }
   })
@@ -215,24 +219,50 @@ export default function TweetTemplatePage() {
   const [picker, setPicker] = useState<{ profile: string; videos: ProfileVideo[] } | null>(null)
   const [pickerSel, setPickerSel] = useState<Set<string>>(new Set())
 
+  // Faz o polling de um vídeo (do servidor) até ficar pronto/erro. Reutilizado
+  // tanto no download inicial quanto ao RETOMAR um download após recarregar.
+  const pollVideoReady = useCallback(async (key: string, videoId: number) => {
+    for (let i = 0; i < 400; i++) {
+      const info = await api.getVideoInfo(videoId).catch(() => null)
+      if (info?.error) {
+        setItems(prev => prev.map(x => x.key === key
+          ? { ...x, error: info.error!.split('\n')[0], status: null, pendingId: null } : x))
+        return
+      }
+      if (info?.ready && info.duration > 0) {
+        setItems(prev => prev.map(x => x.key === key
+          ? { ...x, videoId, pendingId: null, previewUrl: api.streamUrl(videoId, mediaToken ?? undefined), status: null } : x))
+        return
+      }
+      await new Promise(r => setTimeout(r, 3000 + Math.random() * 1500))
+    }
+    setItems(prev => prev.map(x => x.key === key
+      ? { ...x, error: 'o download demorou demais', status: null, pendingId: null } : x))
+  }, [mediaToken])
+
   const downloadUrlItem = useCallback(async (key: string, v: ProfileVideo) => {
     try {
       const p = await api.prepareVideo({ source_url: v.url, direct_url: v.video_url || undefined, title: v.title || undefined })
-      for (let i = 0; i < 400; i++) {
-        const info = await api.getVideoInfo(p.video_id).catch(() => null)
-        if (info?.error) throw new Error(info.error.split('\n')[0])
-        if (info?.ready && info.duration > 0) {
-          setItems(prev => prev.map(x => x.key === key
-            ? { ...x, videoId: p.video_id, previewUrl: api.streamUrl(p.video_id), status: null } : x))
-          return
-        }
-        await new Promise(r => setTimeout(r, 3000 + Math.random() * 1500))
-      }
-      throw new Error('o download demorou demais')
+      // grava o id JÁ (sobrevive ao reload); só vira "pronto" (videoId) quando baixar
+      setItems(prev => prev.map(x => x.key === key ? { ...x, pendingId: p.video_id, status: 'baixando…' } : x))
+      await pollVideoReady(key, p.video_id)
     } catch (e) {
       setItems(prev => prev.map(x => x.key === key
-        ? { ...x, error: e instanceof Error ? e.message : 'falha no download', status: null } : x))
+        ? { ...x, error: e instanceof Error ? e.message : 'falha no download', status: null, pendingId: null } : x))
     }
+  }, [pollVideoReady])
+
+  // Ao montar (reload): retoma qualquer download que ficou pela metade.
+  const resumedRef = useRef(false)
+  useEffect(() => {
+    if (resumedRef.current) return
+    resumedRef.current = true
+    items.forEach(it => {
+      if (it.pendingId != null && it.videoId == null && !it.error) {
+        void pollVideoReady(it.key, it.pendingId)
+      }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const addFromUrls = useCallback((vids: ProfileVideo[]) => {

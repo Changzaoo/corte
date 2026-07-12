@@ -69,6 +69,122 @@ async function fetchToFile(url: string, dest: string): Promise<void> {
   await fs.promises.writeFile(dest, buf)
 }
 
+// ===== Instagram via gallery-dl (o yt-dlp não dá conta do IG) — mesma lógica
+//       do projeto `down`: perfil/reel/post normalizado, crawl perfil→abas→mídia,
+//       com link direto do CDN (video_url) para o prepare baixar rápido. =========
+function resolveGalleryDl(): string {
+  const binName = process.platform === 'win32' ? 'gallery-dl.exe' : 'gallery-dl'
+  const here = path.dirname(fileURLToPath(import.meta.url))
+  const candidates = [
+    process.env.GALLERYDL_PATH,
+    path.resolve(here, '../../../bin', binName),
+    path.resolve(here, '../../bin', binName),
+    path.resolve(process.cwd(), 'apps/server/bin', binName),
+  ].filter(Boolean) as string[]
+  for (const c of candidates) { try { if (fs.existsSync(c)) return c } catch { /* */ } }
+  return 'gallery-dl'
+}
+const GALLERYDL = resolveGalleryDl()
+
+function gdlCookieArgs(): string[] {
+  const file = process.env.YTDLP_COOKIES?.trim()
+  if (file) return ['--cookies', file]
+  const b = process.env.YTDLP_COOKIES_FROM_BROWSER?.trim()
+  if (b) return ['--cookies-from-browser', b]
+  return []
+}
+
+function galleryDl(args: string[], timeoutMs = 300_000): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const p = spawn(GALLERYDL, args)
+    let out = '', err = ''
+    const timer = setTimeout(() => { p.kill('SIGKILL'); reject(new Error('gallery-dl expirou')) }, timeoutMs)
+    p.stdout.on('data', (d) => { out += d.toString() })
+    p.stderr.on('data', (d) => { err += d.toString() })
+    p.on('error', () => { clearTimeout(timer); reject(new Error('gallery-dl não está instalado (necessário para Instagram)')) })
+    p.on('close', (code) => { clearTimeout(timer); (code === 0 || out.trim()) ? resolve(out) : reject(new Error(err.slice(-400) || 'gallery-dl falhou')) })
+  })
+}
+
+const isInstagram = (url: string) => /instagram\.com/i.test(url)
+
+/** Aceita link de perfil OU de um post/reel e normaliza. */
+function normalizeProfileUrl(url: string): string {
+  url = url.trim()
+  if (!url.startsWith('http')) url = 'https://' + url
+  if (url.includes('instagram.com')) {
+    const m1 = url.match(/instagram\.com\/(?:[^/?#]+\/)?(?:p|reels?|tv)\/([A-Za-z0-9_-]{5,})/)
+    if (m1) return `https://www.instagram.com/p/${m1[1]}/`
+    const m2 = url.match(/^https?:\/\/(?:www\.)?instagram\.com\/([^/?#]+)/)
+    if (m2 && !['p', 'reel', 'reels', 'tv', 'stories'].includes(m2[1])) return `https://www.instagram.com/${m2[1]}/`
+  }
+  return url
+}
+
+interface IgVideo { id: string; url: string; title: string; thumbnail: string | null; duration: number | null; video_url: string | null }
+
+/** Lista vídeos de um perfil/post do Instagram (perfil → abas posts/reels → mídia). */
+async function instagramList(url: string): Promise<IgVideo[]> {
+  const posts = new Map<string, IgVideo>()
+  let queue = [url]; const seen = new Set<string>()
+  let lastErr: string | null = null
+
+  const collect = (meta: Record<string, unknown>) => {
+    const isVideo = !!meta.video_url || ['mp4', 'webm'].includes(String(meta.extension || '')) || meta.type === 'reel'
+    if (!isVideo) return
+    const code = String(meta.post_shortcode || meta.shortcode || '')
+    if (!code) return
+    const cur = posts.get(code)
+    const desc = String(meta.description || '').split('\n')
+    posts.set(code, {
+      id: code, url: `https://www.instagram.com/p/${code}/`,
+      title: cur?.title || (desc.find((l) => l.trim()) || code).slice(0, 90),
+      thumbnail: (meta.display_url || meta.thumbnail || cur?.thumbnail || null) as string | null,
+      duration: (meta.video_duration ?? cur?.duration ?? null) as number | null,
+      video_url: (meta.video_url || cur?.video_url || null) as string | null,
+    })
+  }
+
+  for (let depth = 0; depth < 3; depth++) {
+    const batch = queue.filter((u) => !seen.has(u))
+    if (!batch.length) break
+    batch.forEach((u) => seen.add(u))
+    const next: string[] = []
+    // cada aba/URL é independente: uma falhar (ex.: aba "posts" vazia) não
+    // pode derrubar as outras — só falha de verdade se nada for encontrado.
+    for (const u of batch) {
+      try {
+        const out = await galleryDl(['-j', '--range', '1-100', '-o', 'include=posts,reels', '-o', 'sleep-request=2.0-4.0', ...gdlCookieArgs(), u])
+        const msgs = JSON.parse(out) as unknown[]
+        for (const msg of msgs) {
+          if (!Array.isArray(msg) || !msg.length) continue
+          if (msg[0] === -1) { const e = (msg[1] || {}) as Record<string, string>; lastErr = e.message || e.error || lastErr; continue }
+          if (msg[0] === 6 && typeof msg[1] === 'string') { next.push(msg[1]); continue }
+          if ((msg[0] === 2 || msg[0] === 3) && msg.length >= 2) {
+            const meta = (msg[0] === 3 ? msg[2] : msg[1]) as Record<string, unknown>
+            if (meta && typeof meta === 'object') collect(meta)
+          }
+        }
+      } catch (e) { lastErr = e instanceof Error ? e.message : String(e) }
+    }
+    queue = next
+  }
+  if (!posts.size && lastErr) throw new Error(lastErr)
+  return [...posts.values()]
+}
+
+/** Baixa UM post/reel do Instagram para destDir via gallery-dl. Retorna o caminho. */
+async function instagramDownloadTo(url: string, destDir: string): Promise<string> {
+  await fs.promises.mkdir(destDir, { recursive: true })
+  const out = await galleryDl(['-D', destDir, '--filter', "extension in ('mp4', 'webm')", ...gdlCookieArgs(), url], 600_000)
+  const files = out.split('\n').map((l) => l.trim().replace(/^#\s*/, '')).filter(Boolean)
+  if (!files.length) throw new Error('gallery-dl não baixou nada')
+  let p = files[files.length - 1]
+  if (!path.isAbsolute(p)) p = path.join(destDir, path.basename(p))
+  if (!fs.existsSync(p)) throw new Error('arquivo baixado não encontrado')
+  return p
+}
+
 videosRouter.post('/prepare', upload.single('file'), async (req, res, next) => {
   const owner = res.locals.user!.uid
   try {
@@ -99,9 +215,15 @@ videosRouter.post('/prepare', upload.single('file'), async (req, res, next) => {
       const dest = path.join(UPLOAD_DIR, `${Date.now()}_${v.id}.mp4`)
       ;(async () => {
         try {
-          await ytdlp([...cookieArgs(), '-f', 'mp4/best', '--no-playlist', '-o', dest, sourceUrl])
-          const info = await probe(dest)
-          Object.assign(v, { path: dest, ...info, ready: true, title: title || v.title })
+          let outPath = dest
+          if (isInstagram(sourceUrl)) {
+            // Instagram → gallery-dl (yt-dlp não suporta)
+            outPath = await instagramDownloadTo(normalizeProfileUrl(sourceUrl), UPLOAD_DIR)
+          } else {
+            await ytdlp([...cookieArgs(), '-f', 'mp4/best', '--no-playlist', '-o', dest, sourceUrl])
+          }
+          const info = await probe(outPath)
+          Object.assign(v, { path: outPath, ...info, ready: true, title: title || v.title })
         } catch (e) {
           v.error = e instanceof Error ? e.message : 'falha no download'
         }
@@ -134,11 +256,24 @@ videosRouter.get('/:id/stream', (req, res) => {
 export const downloaderRouter = Router()
 downloaderRouter.use(requireAuth, requireApproved)
 
-// List videos of a single link OR a profile/channel (best-effort via yt-dlp).
+// Lista os vídeos de um link único OU de um perfil/canal.
+// Instagram → gallery-dl (yt-dlp falha com "Unsupported URL"); resto → yt-dlp.
 downloaderRouter.post('/list', async (req, res, next) => {
-  const url = (req.body?.url as string || '').trim()
-  if (!url) return res.status(400).json({ error: 'Informe um link' })
+  const raw = (req.body?.url as string || '').trim()
+  if (!raw) return res.status(400).json({ error: 'Informe um link' })
+  const url = normalizeProfileUrl(raw)
   try {
+    if (isInstagram(url)) {
+      const videos = await instagramList(url)
+      if (!videos.length) {
+        return res.status(400).json({
+          error: 'Nenhum vídeo encontrado. Se o perfil é privado ou exige login, ' +
+            'configure os cookies do Instagram (YTDLP_COOKIES ou o navegador logado).',
+        })
+      }
+      return res.json({ profile: url, count: videos.length, videos })
+    }
+
     const out = await ytdlp([...cookieArgs(), '--flat-playlist', '--dump-single-json', '--no-warnings', url], 60_000)
     const j = JSON.parse(out)
     const entries: any[] = j.entries || [j]
@@ -152,6 +287,6 @@ downloaderRouter.post('/list', async (req, res, next) => {
     }))
     res.json({ profile: j.title || j.uploader || url, count: videos.length, videos })
   } catch (e) {
-    res.status(400).json({ error: e instanceof Error ? e.message : 'Não foi possível ler o link. (yt-dlp indisponível?)' })
+    res.status(400).json({ error: e instanceof Error ? e.message : 'Não foi possível ler o link.' })
   }
 })

@@ -32,7 +32,7 @@ export default function Layout({ children }: { children: ReactNode }) {
             )}
             <div className="flex items-center gap-xs rounded-full border border-slate-850 bg-slate-850 py-[3px] pl-[3px] pr-xs sm:pr-sm">
               {profile?.photoURL
-                ? <img src={profile.photoURL} alt="" className="h-7 w-7 rounded-full object-cover" />
+                ? <img src={profile.photoURL} alt="" referrerPolicy="no-referrer" className="h-7 w-7 rounded-full object-cover" />
                 : <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary-500 text-xs font-bold text-white">
                     {(profile?.displayName || profile?.email || '?').trim()[0]?.toUpperCase()}
                   </span>}

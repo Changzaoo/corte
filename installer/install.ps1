@@ -33,6 +33,13 @@ switch ($Step) {
     Ensure node   'OpenJS.NodeJS.LTS'
     Ensure yt-dlp 'yt-dlp.yt-dlp'
     Ensure ffmpeg 'Gyan.FFmpeg'
+    # gallery-dl (Instagram) — binario standalone, sem depender de Python
+    $bin = Join-Path $AppDir 'apps\server\bin'
+    New-Item -ItemType Directory -Force $bin | Out-Null
+    try {
+      Invoke-WebRequest 'https://github.com/mikf/gallery-dl/releases/latest/download/gallery-dl.exe' `
+        -OutFile (Join-Path $bin 'gallery-dl.exe') -UseBasicParsing
+    } catch { Write-Host "aviso: nao consegui baixar o gallery-dl (Instagram)" -ForegroundColor Yellow }
   }
   'build' {
     Refresh-Path

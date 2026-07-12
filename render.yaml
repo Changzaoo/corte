@@ -9,7 +9,7 @@ services:
     rootDir: .
     # --include=dev forces devDependencies (@types/*, typescript) even though
     # NODE_ENV=production would otherwise omit them and break `tsc`.
-    buildCommand: mkdir -p apps/server/bin && curl -fL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux -o apps/server/bin/yt-dlp && chmod a+rx apps/server/bin/yt-dlp && npm install --include=dev && npm --workspace=apps/server run build
+    buildCommand: mkdir -p apps/server/bin && curl -fL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux -o apps/server/bin/yt-dlp && curl -fL https://github.com/mikf/gallery-dl/releases/latest/download/gallery-dl.bin -o apps/server/bin/gallery-dl && chmod a+rx apps/server/bin/yt-dlp apps/server/bin/gallery-dl && npm install --include=dev && npm --workspace=apps/server run build
     startCommand: node apps/server/dist/src/index.js
     healthCheckPath: /health
     autoDeploy: true
