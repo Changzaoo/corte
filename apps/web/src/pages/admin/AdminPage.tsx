@@ -124,6 +124,11 @@ function UserDrawer({ uid, onClose, onChanged }: {
           <>
             {/* actions */}
             <div className="flex flex-wrap gap-xs border-b border-slate-800 px-lg py-sm">
+              {u.role === 'user' && (
+                u.approved
+                  ? <Button variant="secondary" size="sm" disabled={busy} onClick={() => act(() => api.adminUnapprove(uid), 'Acesso revogado')}><XCircle className="h-3 w-3" /> Revogar acesso</Button>
+                  : <Button variant="primary" size="sm" disabled={busy} onClick={() => act(() => api.adminApprove(uid), 'Acesso liberado')}><CheckCircle2 className="h-3 w-3" /> Aprovar acesso</Button>
+              )}
               {u.role !== 'admin' && (
                 <Button variant="secondary" size="sm" disabled={busy}
                   onClick={() => act(() => api.adminSetRole(uid, u.role === 'support' ? 'user' : 'support'), 'Cargo atualizado')}>
@@ -163,6 +168,9 @@ function UserDrawer({ uid, onClose, onChanged }: {
                   <Row label="Total de logins" value={String(u.loginCount)} />
                   <Row label="Criado" value={timeAgo(u.createdAt)} />
                   <Row label="Último login" value={timeAgo(u.lastLoginAt)} />
+                  <Row label="Acesso" value={u.approved
+                    ? <span className="text-success-300">Aprovado</span>
+                    : <span className="text-warning-300">Pendente de aprovação</span>} />
                   <Row label="Status" value={u.banned ? 'Banido' : u.disabled ? 'Suspenso' : 'Ativo'} />
                 </div>
               )}
@@ -339,6 +347,7 @@ export default function AdminPage() {
   }
 
   const s = overview?.stats
+  const pending = users.filter((u) => u.role === 'user' && !u.approved).length
 
   return (
     <div className="h-full overflow-y-auto px-lg py-md">
@@ -351,8 +360,9 @@ export default function AdminPage() {
       </div>
 
       {/* stat cards */}
-      <div className="grid grid-cols-2 gap-sm sm:grid-cols-3 lg:grid-cols-7">
+      <div className="grid grid-cols-2 gap-sm sm:grid-cols-3 lg:grid-cols-8">
         <StatCard icon={Users} label="Usuários" value={s?.totalUsers ?? 0} />
+        <StatCard icon={Clock} label="Pendentes" value={pending} tone={pending > 0 ? 'danger' : 'default'} />
         <StatCard icon={Scissors} label="Cortes" value={s?.totalCuts ?? 0} tone="primary" />
         <StatCard icon={Shield} label="Admins" value={s?.admins ?? 0} tone="primary" />
         <StatCard icon={ShieldAlert} label="Banidos" value={s?.bannedUsers ?? 0} tone="danger" />
@@ -440,6 +450,7 @@ export default function AdminPage() {
                   <td className="py-sm">
                     {u.banned ? <span className="text-error-400">Banido</span>
                       : u.disabled ? <span className="text-warning-400">Suspenso</span>
+                      : (u.role === 'user' && !u.approved) ? <span className="font-semibold text-warning-300">Pendente</span>
                       : <span className="text-success-400">Ativo</span>}
                   </td>
                 </tr>

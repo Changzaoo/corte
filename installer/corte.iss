@@ -3,20 +3,20 @@
 ;  Janela com boas-vindas, termos de uso e barra de progresso por etapa.
 ;  Instala Node/yt-dlp/ffmpeg, prepara o app e sobe o backend local.
 ; ============================================================================
-#define AppName "Corte"
+#define AppName "cortes.digital"
 #define AppVer "1.0.0"
 
 [Setup]
 AppId={{9E5C8B21-CORTE-4F2A-9A11-C0RTE0000001}
 AppName={#AppName}
 AppVersion={#AppVer}
-AppPublisher=Corte
+AppPublisher=cortes.digital
 DefaultDirName={localappdata}\Corte
 DisableProgramGroupPage=yes
 DisableDirPage=yes
 LicenseFile=terms.txt
 OutputDir=.
-OutputBaseFilename=Corte-Setup
+OutputBaseFilename=cortes-digital-Setup
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
@@ -24,7 +24,7 @@ PrivilegesRequired=lowest
 ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayName={#AppName}
 VersionInfoVersion={#AppVer}
-VersionInfoCompany=Corte
+VersionInfoCompany=cortes.digital
 VersionInfoDescription=Instalador do Corte
 VersionInfoProductName={#AppName}
 
@@ -32,7 +32,7 @@ VersionInfoProductName={#AppName}
 Name: "brazilianportuguese"; MessagesFile: "compiler:Languages\BrazilianPortuguese.isl"
 
 [Messages]
-brazilianportuguese.WelcomeLabel2=Este assistente vai instalar o [name] no seu computador.%n%nO Corte baixa e edita seus videos localmente, na sua propria maquina. Vamos instalar tudo que ele precisa (Node.js, yt-dlp e ffmpeg) e deixar pronto para uso.
+brazilianportuguese.WelcomeLabel2=Este assistente vai instalar o [name] no seu computador.%n%nO cortes.digital baixa e edita seus videos localmente, na sua propria maquina. Vamos instalar tudo que ele precisa (Node.js, yt-dlp e ffmpeg) e deixar pronto para uso.
 
 [Files]
 ; App (repo) sem node_modules, git, builds, dados e segredos (.env)

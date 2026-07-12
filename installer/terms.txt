@@ -1,9 +1,9 @@
-TERMOS DE USO - CORTE
+TERMOS DE USO - CORTES.DIGITAL
 
 Ultima atualizacao: 2026
 
-1. O QUE E O CORTE
-O Corte e um aplicativo que roda no SEU proprio computador para baixar
+1. O QUE E O CORTES.DIGITAL
+O cortes.digital e um aplicativo que roda no SEU proprio computador para baixar
 videos de links (YouTube, TikTok, Instagram e outros), montar cortes no
 formato de post (estilo X/Twitter) e entregar os videos prontos para voce.
 
@@ -13,19 +13,19 @@ Ao instalar, este programa vai, na sua maquina:
       * Node.js (motor da aplicacao)
       * yt-dlp (download de videos)
       * ffmpeg (edicao/renderizacao)
-  - Copiar os arquivos do Corte para a sua pasta de usuario.
+  - Copiar os arquivos do cortes.digital para a sua pasta de usuario.
   - Iniciar um servico local (endereco http://localhost:4000) que faz
     o download e a renderizacao no seu computador.
-  - Configurar o Corte para iniciar junto com o Windows.
+  - Configurar o cortes.digital para iniciar junto com o Windows.
 
 3. PRIVACIDADE
 Todo o processamento (download e edicao) acontece localmente, no seu
-computador. O Corte nao envia seus videos para servidores externos.
+computador. O cortes.digital nao envia seus videos para servidores externos.
 
 4. USO RESPONSAVEL / DIREITOS AUTORAIS
 Voce e o unico responsavel pelo conteudo que baixa e publica. Baixe e
 utilize apenas conteudo que voce tem direito de usar. Respeite os direitos
-autorais e os termos de servico das plataformas de origem. O Corte e uma
+autorais e os termos de servico das plataformas de origem. O cortes.digital e uma
 ferramenta; o uso indevido e de sua responsabilidade.
 
 5. GARANTIAS

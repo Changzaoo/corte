@@ -12,6 +12,7 @@ interface AuthState {
   profile: MeProfile | null
   loading: boolean
   isAdmin: boolean
+  approved: boolean
   login: (email: string, password: string) => Promise<void>
   register: (email: string, password: string, name: string) => Promise<void>
   loginGoogle: () => Promise<void>
@@ -64,6 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value: AuthState = {
     user, profile, loading,
     isAdmin: profile?.role === 'admin',
+    approved: profile?.role === 'admin' || profile?.role === 'support' || profile?.approved === true,
     login, register, loginGoogle, logout, resetPassword, refreshProfile: loadProfile,
   }
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

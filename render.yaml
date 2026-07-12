@@ -18,9 +18,9 @@ services:
         value: production
       - key: PORT
         value: "10000"
-      # Set to your Vercel URL after the web app is deployed (comma-separated).
+      # Origens web permitidas (o dominio novo + o de preview da Vercel).
       - key: CORS_ORIGINS
-        sync: false
+        value: https://cortes.digital,https://www.cortes.digital
       - key: ADMIN_EMAILS
         value: redcanidsvinicius@gmail.com,perdibitcoin@gmail.com
       - key: ADMIN_UID

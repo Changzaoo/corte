@@ -3,13 +3,13 @@ import multer from 'multer'
 import fs from 'node:fs'
 import path from 'node:path'
 import { z } from 'zod'
-import { requireAuth } from '../middleware/auth.js'
+import { requireAuth, requireApproved } from '../middleware/auth.js'
 import { AVATAR_DIR, OUTPUT_DIR, videos, newJob, updateJob, newClip } from '../store.js'
 import { renderTweetPreview, renderTweetVideo, type RenderOpts } from '../render/tweetRender.js'
 import { recordRenderEvent } from '../services/sessions.js'
 
 export const tweetRouter = Router()
-tweetRouter.use(requireAuth)
+tweetRouter.use(requireAuth, requireApproved)
 
 const storage = multer.diskStorage({
   destination: (_r, _f, cb) => cb(null, AVATAR_DIR),

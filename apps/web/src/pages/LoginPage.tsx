@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Sparkles, Mail, Lock, User, AlertCircle } from 'lucide-react'
+import { Mail, Lock, User, AlertCircle } from 'lucide-react'
 import { useAuth } from '../AuthContext'
 import { Button } from '../components/ui'
 
@@ -65,10 +65,8 @@ export default function LoginPage() {
     <div className="flex h-screen w-full items-center justify-center bg-slate-950 px-lg">
       <div className="w-full max-w-[400px]">
         <div className="mb-xl flex flex-col items-center gap-sm text-center">
-          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-500 text-white">
-            <Sparkles className="h-7 w-7" />
-          </span>
-          <h1 className="text-2xl font-bold text-slate-50">Corte</h1>
+          <img src="/logo-mark.png" alt="" className="h-16 w-16 rounded-2xl" />
+          <h1 className="text-2xl font-bold text-slate-50">cortes.digital</h1>
           <p className="text-sm text-slate-400">
             {mode === 'login' ? 'Entre para montar seus cortes no template do X.' : 'Crie sua conta para começar.'}
           </p>

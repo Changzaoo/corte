@@ -70,6 +70,24 @@ adminRouter.post('/users/:uid/ban', async (req, res, next) => {
   } catch (e) { next(e) }
 })
 
+adminRouter.post('/users/:uid/approve', async (req, res, next) => {
+  try {
+    await db.collection('users').doc(req.params.uid).set(
+      { approved: true, approvedAt: nowIso(), approvedBy: res.locals.user!.email, updatedAt: nowIso() }, { merge: true })
+    await audit(req, 'approve', req.params.uid)
+    res.json({ ok: true })
+  } catch (e) { next(e) }
+})
+
+adminRouter.post('/users/:uid/unapprove', async (req, res, next) => {
+  try {
+    await db.collection('users').doc(req.params.uid).set(
+      { approved: false, updatedAt: nowIso() }, { merge: true })
+    await audit(req, 'unapprove', req.params.uid)
+    res.json({ ok: true })
+  } catch (e) { next(e) }
+})
+
 adminRouter.post('/users/:uid/unban', async (req, res, next) => {
   try {
     await db.collection('users').doc(req.params.uid).set(

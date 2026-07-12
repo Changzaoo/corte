@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { Shield, LogOut, Sparkles } from 'lucide-react'
+import { Shield, LogOut } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useAuth } from '../AuthContext'
 import BackendStatus from './BackendStatus'
@@ -15,10 +15,8 @@ export default function Layout({ children }: { children: ReactNode }) {
         <div className="flex items-center gap-sm px-md py-sm sm:px-lg">
           {/* brand */}
           <button onClick={() => navigate('/criar/template')} className="flex items-center gap-xs">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-500 text-white shadow-glow">
-              <Sparkles className="h-[18px] w-[18px]" />
-            </span>
-            <span className="text-lg font-bold text-slate-50">Corte</span>
+            <img src="/logo-mark.png" alt="" className="h-9 w-9 rounded-lg" />
+            <span className="text-lg font-bold text-slate-50">cortes.digital</span>
           </button>
 
           {/* right cluster */}

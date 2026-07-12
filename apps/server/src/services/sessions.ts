@@ -23,6 +23,15 @@ export async function roleForUser(user: UserRecord): Promise<Role> {
   return 'user'
 }
 
+/** Um usuario comum precisa de aprovacao do admin. Admin/support sempre ok. */
+export async function isApproved(user: { uid: string; role: Role }): Promise<boolean> {
+  if (user.role === 'admin' || user.role === 'support') return true
+  try {
+    const snap = await db.collection('users').doc(user.uid).get()
+    return snap.exists && snap.data()?.approved === true
+  } catch { return false }
+}
+
 /** Record an explicit login event + upsert the device. Best-effort: never
  *  throws (auth must not break if Firestore is unavailable). */
 export async function recordLogin(
@@ -163,7 +172,7 @@ export interface AdminUserRow {
   uid: string; email: string | null; displayName: string | null; photoURL: string | null
   role: Role; banned: boolean; disabled: boolean; createdAt: string | null; lastLoginAt: string | null
   lastIp: string | null; lastOs: string | null; lastBrowser: string | null; loginCount: number
-  cutsTotal: number
+  cutsTotal: number; approved: boolean
 }
 
 export async function listUsers(): Promise<AdminUserRow[]> {
@@ -180,15 +189,17 @@ export async function listUsers(): Promise<AdminUserRow[]> {
     const page = await authAdmin.listUsers(1000, pageToken)
     for (const u of page.users) {
       const s = summaries.get(u.uid) || {}
+      const role = await roleForUser(u)
       rows.push({
         uid: u.uid, email: u.email || null, displayName: u.displayName || s.displayName || null,
         photoURL: u.photoURL || s.photoURL || null,
-        role: await roleForUser(u),
+        role,
         banned: !!s.banned, disabled: !!u.disabled,
         createdAt: u.metadata.creationTime || s.createdAt || null,
         lastLoginAt: u.metadata.lastSignInTime || s.lastLoginAt || null,
         lastIp: s.lastIp || null, lastOs: s.lastOs || null, lastBrowser: s.lastBrowser || null,
         loginCount: s.loginCount || 0, cutsTotal: s.cutsTotal || 0,
+        approved: role === 'admin' || role === 'support' ? true : s.approved === true,
       })
     }
     pageToken = page.pageToken
@@ -233,6 +244,7 @@ export async function loadUserDetails(uid: string) {
       uid: u.uid, email: u.email || null, displayName: u.displayName || summary.displayName || null,
       photoURL: u.photoURL || summary.photoURL || null, role,
       banned: !!summary.banned, disabled: !!u.disabled,
+      approved: role === 'admin' || role === 'support' ? true : summary.approved === true,
       createdAt: u.metadata.creationTime || null, lastLoginAt: u.metadata.lastSignInTime || summary.lastLoginAt || null,
       lastIp: summary.lastIp || null, lastOs: summary.lastOs || null, lastBrowser: summary.lastBrowser || null,
       loginCount: summary.loginCount || 0,

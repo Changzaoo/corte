@@ -4,12 +4,12 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawn } from 'node:child_process'
-import { requireAuth } from '../middleware/auth.js'
+import { requireAuth, requireApproved } from '../middleware/auth.js'
 import { UPLOAD_DIR, newVideo, videos } from '../store.js'
 import { probeVideo } from '../render/probe.js'
 
 export const videosRouter = Router()
-videosRouter.use(requireAuth)
+videosRouter.use(requireAuth, requireApproved)
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
@@ -132,7 +132,7 @@ videosRouter.get('/:id/stream', (req, res) => {
 })
 
 export const downloaderRouter = Router()
-downloaderRouter.use(requireAuth)
+downloaderRouter.use(requireAuth, requireApproved)
 
 // List videos of a single link OR a profile/channel (best-effort via yt-dlp).
 downloaderRouter.post('/list', async (req, res, next) => {

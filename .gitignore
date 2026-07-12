@@ -22,7 +22,7 @@ firebase-adminsdk*.json
 .render/
 
 # artefato de build do instalador (a cópia servida fica em apps/web/public)
-installer/Corte-Setup.exe
+installer/*.exe
 
 # logs
 *.log
@@ -30,6 +30,7 @@ npm-debug.log*
 logs/
 
 # runtime scratch (uploads, rendered clips, tmp media)
+.data/
 apps/server/.data/
 apps/server/tmp/
 apps/server/uploads/

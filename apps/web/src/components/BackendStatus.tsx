@@ -36,7 +36,7 @@ export default function BackendStatus() {
 
   return (
     <div className="relative" ref={panelRef}>
-      <button onClick={() => setOpen(o => !o)} title="Instalar o Corte no seu PC"
+      <button onClick={() => setOpen(o => !o)} title="Instalar o cortes.digital no seu PC"
         className="flex items-center gap-xs rounded-full border border-primary-500/50 bg-primary-500/10 px-md py-xs text-xs font-semibold text-primary-200 hover:bg-primary-500/20">
         <Download className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Rodar no meu PC</span>
       </button>
@@ -49,15 +49,15 @@ export default function BackendStatus() {
             <button onClick={() => setOpen(false)} className="rounded p-1 text-slate-500 hover:text-slate-200"><X className="h-3.5 w-3.5" /></button>
           </div>
           <p className="mb-sm text-[11px] leading-relaxed text-slate-400">
-            Instale o Corte no seu computador para os downloads (inclusive Instagram/TikTok
+            Instale o cortes.digital no seu computador para os downloads (inclusive Instagram/TikTok
             logados) e a renderização rodarem 100% na sua máquina — sem limite de servidor.
           </p>
           <ol className="mb-sm space-y-xs text-[11px] text-slate-300">
             <li><span className="font-semibold text-slate-100">1.</span> Baixe e execute o instalador (.exe).</li>
-            <li><span className="font-semibold text-slate-100">2.</span> Ele instala tudo (Node, yt-dlp, ffmpeg) e liga o Corte no seu PC.</li>
+            <li><span className="font-semibold text-slate-100">2.</span> Ele instala tudo (Node, yt-dlp, ffmpeg) e liga o cortes.digital no seu PC.</li>
             <li><span className="font-semibold text-slate-100">3.</span> Volte aqui e clique em "Já instalei — testar".</li>
           </ol>
-          <a href="/Corte-Setup.exe" download
+          <a href="/cortes-digital-Setup.exe" download
             className="mb-xs flex items-center justify-center gap-xs rounded-lg bg-primary-500 px-md py-sm text-xs font-semibold text-white hover:bg-primary-600">
             <Download className="h-4 w-4" /> Baixar instalador (.exe)
           </a>

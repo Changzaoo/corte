@@ -59,7 +59,7 @@ export type Role = 'admin' | 'support' | 'user'
 export interface MeProfile {
   uid: string; email: string | null; displayName: string | null
   photoURL: string | null; role: Role; banned: boolean; disabled: boolean
-  createdAt: string | null; lastLoginAt: string | null
+  createdAt: string | null; lastLoginAt: string | null; approved: boolean
 }
 export interface LoginEvent {
   id: string; loginAt: string; ip: string; os: string; browser: string
@@ -77,7 +77,7 @@ export interface AdminUser {
   uid: string; email: string | null; displayName: string | null; photoURL: string | null
   role: Role; banned: boolean; disabled: boolean; createdAt: string | null
   lastLoginAt: string | null; lastIp: string | null; lastOs: string | null
-  lastBrowser: string | null; loginCount: number; cutsTotal: number
+  lastBrowser: string | null; loginCount: number; cutsTotal: number; approved: boolean
 }
 export interface AdminOverview {
   stats: {
@@ -154,6 +154,8 @@ export const api = {
   adminSetRole: (uid: string, role: Role) => request<{ ok: boolean }>('POST', `/api/admin/users/${uid}/role`, { role }),
   adminBan: (uid: string, reason: string, duration: 'permanent' | '1d' | '7d' | '30d') =>
     request<{ ok: boolean }>('POST', `/api/admin/users/${uid}/ban`, { reason, duration }),
+  adminApprove: (uid: string) => request<{ ok: boolean }>('POST', `/api/admin/users/${uid}/approve`),
+  adminUnapprove: (uid: string) => request<{ ok: boolean }>('POST', `/api/admin/users/${uid}/unapprove`),
   adminUnban: (uid: string) => request<{ ok: boolean }>('POST', `/api/admin/users/${uid}/unban`),
   adminSuspend: (uid: string) => request<{ ok: boolean }>('POST', `/api/admin/users/${uid}/suspend`),
   adminReactivate: (uid: string) => request<{ ok: boolean }>('POST', `/api/admin/users/${uid}/reactivate`),
