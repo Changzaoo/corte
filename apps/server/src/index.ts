@@ -22,8 +22,22 @@ app.use(helmet({
 }))
 
 const allowAll = config.corsOrigins.includes('*')
+// Origens sempre liberadas (o domínio oficial + previews da Vercel + localhost),
+// independente do CORS_ORIGINS configurado no painel do Render.
+const ALWAYS_ALLOW = [
+  /^https:\/\/(www\.)?cortes\.digital$/i,
+  /\.vercel\.app$/i,
+  /^https?:\/\/localhost(:\d+)?$/i,
+  /^https?:\/\/127\.0\.0\.1(:\d+)?$/i,
+]
 app.use(cors({
-  origin: allowAll ? true : config.corsOrigins,
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true) // apps nativos / curl / same-origin
+    if (allowAll) return cb(null, true)
+    if (config.corsOrigins.includes(origin)) return cb(null, true)
+    if (ALWAYS_ALLOW.some((re) => re.test(origin))) return cb(null, true)
+    return cb(null, false)
+  },
   credentials: false,
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Corte-Device-ID', 'X-Corte-Device-Name'],
 }))
