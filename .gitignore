@@ -21,6 +21,9 @@ firebase-adminsdk*.json
 .vercel/
 .render/
 
+# artefato de build do instalador (a cópia servida fica em apps/web/public)
+installer/Corte-Setup.exe
+
 # logs
 *.log
 npm-debug.log*
