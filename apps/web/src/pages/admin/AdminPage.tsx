@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   Users, ShieldAlert, LogIn, XCircle, MonitorSmartphone, Shield, Search, Loader2,
   RefreshCw, Ban, CheckCircle2, Trash2, UserCog, Globe, Clock, StickyNote, X,
+  Scissors, Link2, UserSquare,
 } from 'lucide-react'
 import {
   api, type AdminOverview, type AdminUser, type AdminUserDetails, type Role,
@@ -76,7 +77,7 @@ function UserDrawer({ uid, onClose, onChanged }: {
   const { toast } = useContextMenu()
   const { profile: me } = useAuth()
   const [data, setData] = useState<AdminUserDetails | null>(null)
-  const [tab, setTab] = useState<'summary' | 'logins' | 'devices' | 'notes'>('summary')
+  const [tab, setTab] = useState<'summary' | 'cuts' | 'logins' | 'devices' | 'notes'>('summary')
   const [loading, setLoading] = useState(true)
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
@@ -143,10 +144,10 @@ function UserDrawer({ uid, onClose, onChanged }: {
 
             {/* tabs */}
             <div className="flex shrink-0 gap-xs border-b border-slate-800 px-lg">
-              {(['summary', 'logins', 'devices', 'notes'] as const).map((t) => (
+              {(['summary', 'cuts', 'logins', 'devices', 'notes'] as const).map((t) => (
                 <button key={t} onClick={() => setTab(t)}
                   className={`relative px-sm py-sm text-xs font-semibold capitalize ${tab === t ? 'text-slate-50' : 'text-slate-500 hover:text-slate-300'}`}>
-                  {t === 'summary' ? 'Resumo' : t === 'logins' ? 'Logins' : t === 'devices' ? 'Dispositivos' : 'Notas'}
+                  {t === 'summary' ? 'Resumo' : t === 'cuts' ? 'Cortes' : t === 'logins' ? 'Logins' : t === 'devices' ? 'Dispositivos' : 'Notas'}
                   {tab === t && <span className="absolute inset-x-1 -bottom-px h-[2px] rounded bg-primary-500" />}
                 </button>
               ))}
@@ -165,6 +166,69 @@ function UserDrawer({ uid, onClose, onChanged }: {
                   <Row label="Status" value={u.banned ? 'Banido' : u.disabled ? 'Suspenso' : 'Ativo'} />
                 </div>
               )}
+
+              {tab === 'cuts' && (() => {
+                const rs = data!.renderStats
+                return (
+                  <div className="space-y-md">
+                    <div className="grid grid-cols-2 gap-sm">
+                      <div className="rounded-lg border border-slate-800 bg-slate-925 px-md py-sm">
+                        <p className="flex items-center gap-xs text-2xl font-bold text-slate-50"><Scissors className="h-4 w-4 text-primary-400" /> {rs.totalCuts}</p>
+                        <p className="text-[11px] uppercase tracking-wide text-slate-500">Cortes gerados</p>
+                      </div>
+                      <div className="rounded-lg border border-slate-800 bg-slate-925 px-md py-sm">
+                        <p className="text-2xl font-bold text-slate-50">{rs.renders}</p>
+                        <p className="text-[11px] uppercase tracking-wide text-slate-500">Gerações (lotes)</p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="mb-xs flex items-center gap-xs text-[11px] font-semibold uppercase tracking-wide text-slate-500"><UserSquare className="h-3.5 w-3.5" /> Perfis usados</p>
+                      {rs.profilesUsed.length === 0 && <p className="text-xs text-slate-500">Nenhum ainda.</p>}
+                      <div className="space-y-xs">
+                        {rs.profilesUsed.map((p, i) => (
+                          <div key={i} className="flex items-center gap-sm rounded-lg border border-slate-800 bg-slate-925 px-sm py-xs text-xs">
+                            <span className="truncate text-slate-200">{p.name || '—'}</span>
+                            {p.handle && <span className="truncate text-slate-500">@{p.handle}</span>}
+                            <span className="ml-auto shrink-0 rounded-full bg-primary-500/10 px-sm py-[1px] text-[11px] font-semibold text-primary-300">{p.count} corte(s)</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="mb-xs flex items-center gap-xs text-[11px] font-semibold uppercase tracking-wide text-slate-500"><Link2 className="h-3.5 w-3.5" /> Fontes / links baixados</p>
+                      {rs.sources.length === 0 && <p className="text-xs text-slate-500">Nenhum link registrado (envios por arquivo não têm fonte).</p>}
+                      <div className="space-y-xs">
+                        {rs.sources.map((sc, i) => (
+                          <div key={i} className="flex items-center gap-sm rounded-lg border border-slate-800 bg-slate-925 px-sm py-xs text-xs">
+                            <a href={sc.url} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate text-primary-300 hover:underline" title={sc.url}>{sc.url}</a>
+                            <span className="shrink-0 text-slate-500">{sc.count}x</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {rs.recent.length > 0 && (
+                      <div>
+                        <p className="mb-xs flex items-center gap-xs text-[11px] font-semibold uppercase tracking-wide text-slate-500"><Clock className="h-3.5 w-3.5" /> Gerações recentes</p>
+                        <div className="space-y-xs">
+                          {rs.recent.map((e, i) => (
+                            <div key={i} className="rounded-lg border border-slate-800 bg-slate-925 px-sm py-xs text-xs">
+                              <div className="flex items-center gap-xs">
+                                <span className="font-semibold text-slate-200">{e.count} corte(s)</span>
+                                <span className="text-slate-500">· {e.profileName || '—'}{e.profileHandle ? ` (@${e.profileHandle})` : ''}</span>
+                                <span className="ml-auto text-slate-500">{timeAgo(e.at)}</span>
+                              </div>
+                              {e.sources.length > 0 && <p className="mt-[2px] truncate text-[11px] text-slate-500">{e.sources.join(', ')}</p>}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
 
               {tab === 'logins' && (
                 <div className="space-y-xs">
@@ -287,8 +351,9 @@ export default function AdminPage() {
       </div>
 
       {/* stat cards */}
-      <div className="grid grid-cols-2 gap-sm sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-sm sm:grid-cols-3 lg:grid-cols-7">
         <StatCard icon={Users} label="Usuários" value={s?.totalUsers ?? 0} />
+        <StatCard icon={Scissors} label="Cortes" value={s?.totalCuts ?? 0} tone="primary" />
         <StatCard icon={Shield} label="Admins" value={s?.admins ?? 0} tone="primary" />
         <StatCard icon={ShieldAlert} label="Banidos" value={s?.bannedUsers ?? 0} tone="danger" />
         <StatCard icon={LogIn} label="Logins 24h" value={s?.logins24h ?? 0} tone="success" />
@@ -341,6 +406,7 @@ export default function AdminPage() {
               <tr className="border-b border-slate-800">
                 <th className="py-xs pr-md font-medium">Usuário</th>
                 <th className="py-xs pr-md font-medium">Cargo</th>
+                <th className="py-xs pr-md font-medium">Cortes</th>
                 <th className="py-xs pr-md font-medium">Último IP</th>
                 <th className="py-xs pr-md font-medium">SO</th>
                 <th className="py-xs pr-md font-medium">Logins</th>
@@ -364,6 +430,9 @@ export default function AdminPage() {
                     </div>
                   </td>
                   <td className="py-sm pr-md"><RoleBadge role={u.role} /></td>
+                  <td className="py-sm pr-md">
+                    <span className="inline-flex items-center gap-xs text-slate-200"><Scissors className="h-3 w-3 text-primary-400" /> {u.cutsTotal ?? 0}</span>
+                  </td>
                   <td className="py-sm pr-md font-mono text-slate-400">{u.lastIp || '—'}</td>
                   <td className="py-sm pr-md text-slate-400">{u.lastOs || '—'}</td>
                   <td className="py-sm pr-md text-slate-400">{u.loginCount}</td>

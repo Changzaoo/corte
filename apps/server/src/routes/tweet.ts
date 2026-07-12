@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { requireAuth } from '../middleware/auth.js'
 import { AVATAR_DIR, OUTPUT_DIR, videos, newJob, updateJob, newClip } from '../store.js'
 import { renderTweetPreview, renderTweetVideo, type RenderOpts } from '../render/tweetRender.js'
+import { recordRenderEvent } from '../services/sessions.js'
 
 export const tweetRouter = Router()
 tweetRouter.use(requireAuth)
@@ -104,6 +105,11 @@ tweetRouter.post('/render', async (req, res, next) => {
     const job = newJob(owner)
     updateJob(job.id, { status: 'rendering', stageDetail: 'Renderizando…' })
 
+    // capture, for analytics, who rendered and the source links used
+    const authUser = { uid: owner, email: res.locals.user!.email }
+    const sources = Array.from(new Set(
+      body.items.map((it) => videos.get(it.video_id)?.sourceUrl).filter(Boolean) as string[]))
+
     ;(async () => {
       let done = 0
       for (let i = 0; i < body.items.length; i++) {
@@ -124,6 +130,11 @@ tweetRouter.post('/render', async (req, res, next) => {
       updateJob(job.id, done > 0
         ? { status: 'done', progress: 100, stageDetail: 'Concluído' }
         : { status: 'failed', error: 'Nenhum vídeo foi renderizado' })
+      // analytics: cortes feitos, perfil usado e fontes/links
+      void recordRenderEvent(authUser, {
+        jobId: job.id, count: done,
+        profileName: body.profile.name, profileHandle: body.profile.handle, sources,
+      })
     })().catch((e) => updateJob(job.id, { status: 'failed', error: e?.message || 'Falha no render' }))
 
     res.json({ job_id: job.id, count: body.items.length })

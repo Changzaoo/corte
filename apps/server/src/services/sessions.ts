@@ -78,6 +78,66 @@ export async function recordLogin(
   }
 }
 
+/** Record a render/"corte" event: how many cuts, which profile, and the
+ *  source links used. Best-effort (Firestore). Also bumps a cheap per-user
+ *  counter so the users list can show totals without scanning events. */
+export async function recordRenderEvent(
+  user: { uid: string; email: string | null },
+  data: { jobId: number; count: number; profileName: string; profileHandle: string; sources: string[] },
+): Promise<void> {
+  if (data.count <= 0) return
+  try {
+    await db.collection('render_events').add({
+      userId: user.uid, email: user.email || null, at: nowIso(),
+      jobId: data.jobId, count: data.count,
+      profileName: data.profileName || null, profileHandle: data.profileHandle || null,
+      sources: data.sources || [],
+    })
+    const uref = db.collection('users').doc(user.uid)
+    const usnap = await uref.get()
+    await uref.set({
+      email: user.email || null,
+      cutsTotal: ((usnap.exists ? usnap.data()?.cutsTotal : 0) || 0) + data.count,
+      rendersTotal: ((usnap.exists ? usnap.data()?.rendersTotal : 0) || 0) + 1,
+      lastRenderAt: nowIso(),
+    }, { merge: true })
+  } catch (e) {
+    console.warn('[sessions] recordRenderEvent failed:', (e as Error).message)
+  }
+}
+
+/** Aggregate a user's render history: total cuts, per-profile usage and the
+ *  source links they've pulled from. */
+export async function loadRenderStats(uid: string) {
+  const events: any[] = []
+  try {
+    const snap = await db.collection('render_events').where('userId', '==', uid).limit(1000).get()
+    snap.forEach((d) => events.push(d.data()))
+  } catch { /* firestore disabled */ }
+  events.sort((a, b) => (b.at || '').localeCompare(a.at || ''))
+
+  let totalCuts = 0
+  const profileMap = new Map<string, { name: string; handle: string; count: number }>()
+  const sourceMap = new Map<string, number>()
+  for (const e of events) {
+    totalCuts += e.count || 0
+    const key = (e.profileHandle || e.profileName || '—').toLowerCase()
+    const prev = profileMap.get(key) || { name: e.profileName || '', handle: e.profileHandle || '', count: 0 }
+    prev.count += e.count || 0
+    profileMap.set(key, prev)
+    for (const s of (e.sources || [])) if (s) sourceMap.set(s, (sourceMap.get(s) || 0) + 1)
+  }
+  return {
+    totalCuts, renders: events.length,
+    profilesUsed: [...profileMap.values()].sort((a, b) => b.count - a.count),
+    sources: [...sourceMap.entries()].map(([url, count]) => ({ url, count })).sort((a, b) => b.count - a.count),
+    recent: events.slice(0, 30).map((e) => ({
+      at: e.at, count: e.count || 0, profileName: e.profileName || '', profileHandle: e.profileHandle || '',
+      sources: e.sources || [],
+    })),
+  }
+}
+
 /** Passive device "last seen" upsert (throttled ~5min) on authed requests. */
 export async function touchDevice(req: Request, user: UserRecord): Promise<void> {
   try {
@@ -103,6 +163,7 @@ export interface AdminUserRow {
   uid: string; email: string | null; displayName: string | null; photoURL: string | null
   role: Role; banned: boolean; disabled: boolean; createdAt: string | null; lastLoginAt: string | null
   lastIp: string | null; lastOs: string | null; lastBrowser: string | null; loginCount: number
+  cutsTotal: number
 }
 
 export async function listUsers(): Promise<AdminUserRow[]> {
@@ -127,7 +188,7 @@ export async function listUsers(): Promise<AdminUserRow[]> {
         createdAt: u.metadata.creationTime || s.createdAt || null,
         lastLoginAt: u.metadata.lastSignInTime || s.lastLoginAt || null,
         lastIp: s.lastIp || null, lastOs: s.lastOs || null, lastBrowser: s.lastBrowser || null,
-        loginCount: s.loginCount || 0,
+        loginCount: s.loginCount || 0, cutsTotal: s.cutsTotal || 0,
       })
     }
     pageToken = page.pageToken
@@ -165,6 +226,8 @@ export async function loadUserDetails(uid: string) {
     snap.forEach((d) => notes.push({ id: d.id, ...d.data() }))
   } catch { /* */ }
 
+  const renderStats = await loadRenderStats(uid)
+
   return {
     user: {
       uid: u.uid, email: u.email || null, displayName: u.displayName || summary.displayName || null,
@@ -187,6 +250,7 @@ export async function loadUserDetails(uid: string) {
       recentIps: d.recentIps || [], trusted: (d.loginCount || 0) > 1, suspicious: (d.loginCount || 0) <= 1,
     })),
     notes: notes.map((n) => ({ id: n.id, note: n.note, createdByEmail: n.createdByEmail, createdAt: n.createdAt })),
+    renderStats,
   }
 }
 
@@ -237,6 +301,7 @@ export async function buildOverview() {
       admins: users.filter((u) => u.role === 'admin').length,
       bannedUsers: users.filter((u) => u.banned).length,
       logins24h, failedLogins24h: failed24h, activeDevices,
+      totalCuts: users.reduce((sum, u) => sum + (u.cutsTotal || 0), 0),
     },
     recentLogins, usersByOs, loginsByDay: last7,
   }

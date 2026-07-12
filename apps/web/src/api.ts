@@ -49,20 +49,27 @@ export interface AdminUser {
   uid: string; email: string | null; displayName: string | null; photoURL: string | null
   role: Role; banned: boolean; disabled: boolean; createdAt: string | null
   lastLoginAt: string | null; lastIp: string | null; lastOs: string | null
-  lastBrowser: string | null; loginCount: number
+  lastBrowser: string | null; loginCount: number; cutsTotal: number
 }
 export interface AdminOverview {
   stats: {
     totalUsers: number; admins: number; bannedUsers: number
-    logins24h: number; failedLogins24h: number; activeDevices: number
+    logins24h: number; failedLogins24h: number; activeDevices: number; totalCuts: number
   }
   recentLogins: LoginEvent[]
   usersByOs: { name: string; count: number }[]
   loginsByDay: { date: string; count: number }[]
 }
+export interface RenderStats {
+  totalCuts: number; renders: number
+  profilesUsed: { name: string; handle: string; count: number }[]
+  sources: { url: string; count: number }[]
+  recent: { at: string; count: number; profileName: string; profileHandle: string; sources: string[] }[]
+}
 export interface AdminUserDetails {
   user: AdminUser; loginEvents: LoginEvent[]; devices: DeviceRecord[]
   notes: { id: string; note: string; createdByEmail: string | null; createdAt: string }[]
+  renderStats: RenderStats
 }
 
 // ---- request helper: attaches Firebase idToken + device headers ------------
