@@ -23,6 +23,8 @@ services:
         sync: false
       - key: ADMIN_EMAILS
         value: redcanidsvinicius@gmail.com,perdibitcoin@gmail.com
+      - key: ADMIN_UID
+        value: PKrc1M1Fhdceq0Y83BueSMKTPQe2
       - key: DEVICE_HASH_SECRET
         generateValue: true
       - key: FIREBASE_PROJECT_ID

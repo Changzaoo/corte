@@ -15,7 +15,7 @@ export const config = {
   // independent of Firebase custom claims. Comma-separated.
   adminEmails: (process.env.ADMIN_EMAILS || 'redcanidsvinicius@gmail.com,perdibitcoin@gmail.com')
     .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
-  adminUid: process.env.ADMIN_UID || '',
+  adminUid: process.env.ADMIN_UID || 'PKrc1M1Fhdceq0Y83BueSMKTPQe2',
 
   // Server pepper used to hash device ids before storing them.
   deviceHashSecret: process.env.DEVICE_HASH_SECRET || 'corte-dev-device-pepper',
