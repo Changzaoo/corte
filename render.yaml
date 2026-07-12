@@ -7,7 +7,9 @@ services:
     plan: free
     region: oregon
     rootDir: .
-    buildCommand: npm install && npm --workspace=apps/server run build
+    # --include=dev forces devDependencies (@types/*, typescript) even though
+    # NODE_ENV=production would otherwise omit them and break `tsc`.
+    buildCommand: npm install --include=dev && npm --workspace=apps/server run build
     startCommand: node apps/server/dist/src/index.js
     healthCheckPath: /health
     autoDeploy: true
