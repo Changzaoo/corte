@@ -85,7 +85,7 @@ export interface Clip {
   created_at: string
 }
 export interface ProfileVideo {
-  id: string | null; url: string; title: string | null; thumbnail: string | null
+  id: string | null; url: string; title: string | null; caption?: string | null; thumbnail: string | null
   duration: number | null; video_url?: string | null
 }
 export interface ProfileVideos { profile: string; count: number; videos: ProfileVideo[] }

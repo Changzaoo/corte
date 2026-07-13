@@ -118,6 +118,85 @@ function galleryDl(args: string[], timeoutMs = 300_000): Promise<string> {
 
 const isInstagram = (url: string) => /instagram\.com/i.test(url)
 
+const IG_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36'
+const IG_RESERVED = ['p', 'reel', 'reels', 'tv', 'stories', 'explore', 'accounts', 'direct']
+
+/** Lê os cookies do Instagram (Netscape) do arquivo configurado/gerenciado. */
+function readIgCookies(): Record<string, string> | null {
+  const file = process.env.YTDLP_COOKIES?.trim() || managedCookiesFile()
+  if (!file) return null
+  try {
+    const out: Record<string, string> = {}
+    for (const ln of fs.readFileSync(file, 'utf8').split('\n')) {
+      const p = ln.replace(/\r$/, '').split('\t')
+      if (p.length >= 7 && p[0].toLowerCase().includes('instagram')) out[p[5]] = p[6]
+    }
+    return out.sessionid ? out : null
+  } catch { return null }
+}
+
+/** username de uma URL de PERFIL do Instagram (não post/reel). */
+function igProfileUsername(url: string): string | null {
+  const m = url.match(/^https?:\/\/(?:www\.)?instagram\.com\/([^/?#]+)\/?$/)
+  if (m && !IG_RESERVED.includes(m[1].toLowerCase())) return m[1]
+  return null
+}
+
+/** RÁPIDO: lista os vídeos de um perfil batendo direto na API web do Instagram
+ *  (a mesma do site logado). Segundos, paginado, pega o perfil inteiro. */
+const igListCache = new Map<string, { at: number; videos: IgVideo[] }>()
+const IG_CACHE_TTL = 600_000 // 10 min — busca repetida do mesmo perfil volta na hora
+
+async function instagramApiList(username: string, limit = 300): Promise<IgVideo[]> {
+  const cached = igListCache.get(username.toLowerCase())
+  if (cached && Date.now() - cached.at < IG_CACHE_TTL) return cached.videos
+  const cookies = readIgCookies()
+  if (!cookies) throw new Error('cookies do Instagram necessários (clique em Conectar Instagram)')
+  const headers: Record<string, string> = {
+    'User-Agent': IG_UA,
+    'x-ig-app-id': '936619743392459',
+    'x-csrftoken': cookies.csrftoken || '',
+    'x-requested-with': 'XMLHttpRequest',
+    Referer: `https://www.instagram.com/${username}/`,
+    Accept: '*/*',
+    Cookie: Object.entries(cookies).map(([k, v]) => `${k}=${v}`).join('; '),
+  }
+  const videos: IgVideo[] = []
+  let maxId: string | null = null
+  for (let page = 0; videos.length < limit && page < 20; page++) {
+    const params = new URLSearchParams({ count: '33' })
+    if (maxId) params.set('max_id', maxId)
+    const r = await fetch(`https://www.instagram.com/api/v1/feed/user/${username}/username/?${params}`, { headers })
+    if (r.status === 429 && !videos.length) throw new Error('O Instagram limitou temporariamente as consultas (rate-limit). Aguarde ~30 min e tente de novo.')
+    if (r.status !== 200) { if (videos.length) break; throw new Error(`API web do Instagram respondeu HTTP ${r.status}`) }
+    const data = await r.json() as { items?: any[]; more_available?: boolean; next_max_id?: string }
+    for (const m of (data.items || [])) {
+      let v: any = m.media_type === 2 ? m : null
+      if (!v && m.media_type === 8) v = (m.carousel_media || []).find((s: any) => s.media_type === 2)
+      const code = m.code
+      if (!v || !code) continue
+      const capText = String((m.caption || {}).text || '')
+      const cap = capText.split('\n')
+      const thumbs = (v.image_versions2 || {}).candidates || []
+      const vurls = v.video_versions || []
+      videos.push({
+        id: code, url: `https://www.instagram.com/p/${code}/`,
+        title: (cap.find((l) => l.trim()) || code).slice(0, 90),
+        caption: capText,
+        thumbnail: thumbs[0]?.url || null,
+        duration: v.video_duration || null,
+        video_url: vurls[0]?.url || null,
+      })
+    }
+    if (!data.more_available || !data.next_max_id) break
+    maxId = data.next_max_id
+    await new Promise((res) => setTimeout(res, 350))
+  }
+  const out = videos.slice(0, limit)
+  if (out.length) igListCache.set(username.toLowerCase(), { at: Date.now(), videos: out })
+  return out
+}
+
 /** Aceita link de perfil OU de um post/reel e normaliza. */
 function normalizeProfileUrl(url: string): string {
   url = url.trim()
@@ -131,7 +210,7 @@ function normalizeProfileUrl(url: string): string {
   return url
 }
 
-interface IgVideo { id: string; url: string; title: string; thumbnail: string | null; duration: number | null; video_url: string | null }
+interface IgVideo { id: string; url: string; title: string; caption?: string; thumbnail: string | null; duration: number | null; video_url: string | null }
 
 /** Lista vídeos de um perfil/post do Instagram (perfil → abas posts/reels → mídia). */
 async function instagramList(url: string): Promise<IgVideo[]> {
@@ -278,11 +357,20 @@ downloaderRouter.post('/list', async (req, res, next) => {
   const url = normalizeProfileUrl(raw)
   try {
     if (isInstagram(url)) {
-      const videos = await instagramList(url)
+      // Caminho RÁPIDO: perfil via API web direta (segundos, pega tudo).
+      // Fallback: crawl via gallery-dl (mais lento) para posts/reels avulsos ou
+      // se a API web falhar.
+      const username = igProfileUsername(url)
+      let videos: IgVideo[] = []
+      if (username) {
+        try { videos = await instagramApiList(username) }
+        catch (e) { console.warn('[ig] API web falhou, tentando gallery-dl:', (e as Error).message) }
+      }
+      if (!videos.length) videos = await instagramList(url)
       if (!videos.length) {
         return res.status(400).json({
           error: 'Nenhum vídeo encontrado. Se o perfil é privado ou exige login, ' +
-            'configure os cookies do Instagram (YTDLP_COOKIES ou o navegador logado).',
+            'clique em "Conectar Instagram" no topo para logar.',
         })
       }
       return res.json({ profile: url, count: videos.length, videos })
