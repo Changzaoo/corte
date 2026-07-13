@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import {
   Users, ShieldAlert, LogIn, XCircle, MonitorSmartphone, Shield, Search, Loader2,
   RefreshCw, Ban, CheckCircle2, Trash2, UserCog, Globe, Clock, StickyNote, X,
@@ -22,16 +22,20 @@ function timeAgo(iso: string | null): string {
   return `${Math.floor(s / 86400)}d`
 }
 
-function StatCard({ icon: Icon, label, value, tone = 'default' }: {
+function StatCard({ icon: Icon, label, value, tone = 'default', onClick, active }: {
   icon: typeof Users; label: string; value: number | string
   tone?: 'default' | 'danger' | 'success' | 'primary'
+  onClick?: () => void; active?: boolean
 }) {
   const tones = {
     default: 'text-slate-300', danger: 'text-error-400',
     success: 'text-success-400', primary: 'text-primary-400',
   }
   return (
-    <div className="flex items-center gap-md rounded-xl border border-slate-800 bg-slate-925 px-lg py-md">
+    <button type="button" onClick={onClick} disabled={!onClick}
+      className={`flex items-center gap-md rounded-xl border px-lg py-md text-left transition-colors ${
+        active ? 'border-primary-500 bg-primary-500/10'
+        : 'border-slate-800 bg-slate-925'} ${onClick ? 'cursor-pointer hover:border-slate-600 hover:bg-slate-850' : ''}`}>
       <span className={`flex h-10 w-10 items-center justify-center rounded-lg bg-slate-850 ${tones[tone]}`}>
         <Icon className="h-5 w-5" />
       </span>
@@ -39,7 +43,7 @@ function StatCard({ icon: Icon, label, value, tone = 'default' }: {
         <p className="text-2xl font-bold text-slate-50">{value}</p>
         <p className="text-[11px] uppercase tracking-wide text-slate-500">{label}</p>
       </div>
-    </div>
+    </button>
   )
 }
 
@@ -378,6 +382,15 @@ export default function AdminPage() {
   const [q, setQ] = useState('')
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<string | null>(null)
+  type UserFilter = 'all' | 'pending' | 'admin' | 'banned' | 'cortes'
+  const [userFilter, setUserFilter] = useState<UserFilter>('all')
+  const [onlyFailedLogins, setOnlyFailedLogins] = useState(false)
+  const usersRef = useRef<HTMLDivElement>(null)
+  const loginsRef = useRef<HTMLDivElement>(null)
+  const scrollTo = (r: RefObject<HTMLDivElement>) =>
+    setTimeout(() => r.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+  const showUsers = (f: UserFilter) => { setUserFilter(f); scrollTo(usersRef) }
+  const showLogins = (failed: boolean) => { setOnlyFailedLogins(failed); scrollTo(loginsRef) }
 
   const load = async () => {
     setLoading(true)
@@ -391,13 +404,18 @@ export default function AdminPage() {
   useEffect(() => { void load() }, [])
 
   const filtered = useMemo(() => {
+    let list = users.slice()
+    if (userFilter === 'pending') list = list.filter((u) => u.role === 'user' && !u.approved)
+    else if (userFilter === 'admin') list = list.filter((u) => u.role === 'admin')
+    else if (userFilter === 'banned') list = list.filter((u) => u.banned)
+    else if (userFilter === 'cortes') list = list.filter((u) => (u.cutsTotal || 0) > 0).sort((a, b) => (b.cutsTotal || 0) - (a.cutsTotal || 0))
     const s = q.trim().toLowerCase()
-    if (!s) return users
-    return users.filter((u) =>
+    if (s) list = list.filter((u) =>
       (u.email || '').toLowerCase().includes(s) ||
       (u.displayName || '').toLowerCase().includes(s) ||
       (u.lastIp || '').includes(s))
-  }, [users, q])
+    return list
+  }, [users, q, userFilter])
 
   if (loading && !overview) {
     return <div className="flex h-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary-400" /></div>
@@ -418,14 +436,14 @@ export default function AdminPage() {
 
       {/* stat cards */}
       <div className="grid grid-cols-2 gap-sm sm:grid-cols-3 lg:grid-cols-8">
-        <StatCard icon={Users} label="Usuários" value={s?.totalUsers ?? 0} />
-        <StatCard icon={Clock} label="Pendentes" value={pending} tone={pending > 0 ? 'danger' : 'default'} />
-        <StatCard icon={Scissors} label="Cortes" value={s?.totalCuts ?? 0} tone="primary" />
-        <StatCard icon={Shield} label="Admins" value={s?.admins ?? 0} tone="primary" />
-        <StatCard icon={ShieldAlert} label="Banidos" value={s?.bannedUsers ?? 0} tone="danger" />
-        <StatCard icon={LogIn} label="Logins 24h" value={s?.logins24h ?? 0} tone="success" />
-        <StatCard icon={XCircle} label="Falhas 24h" value={s?.failedLogins24h ?? 0} tone="danger" />
-        <StatCard icon={MonitorSmartphone} label="Dispositivos" value={s?.activeDevices ?? 0} />
+        <StatCard icon={Users} label="Usuários" value={s?.totalUsers ?? 0} onClick={() => showUsers('all')} active={userFilter === 'all'} />
+        <StatCard icon={Clock} label="Pendentes" value={pending} tone={pending > 0 ? 'danger' : 'default'} onClick={() => showUsers('pending')} active={userFilter === 'pending'} />
+        <StatCard icon={Scissors} label="Cortes" value={s?.totalCuts ?? 0} tone="primary" onClick={() => showUsers('cortes')} active={userFilter === 'cortes'} />
+        <StatCard icon={Shield} label="Admins" value={s?.admins ?? 0} tone="primary" onClick={() => showUsers('admin')} active={userFilter === 'admin'} />
+        <StatCard icon={ShieldAlert} label="Banidos" value={s?.bannedUsers ?? 0} tone="danger" onClick={() => showUsers('banned')} active={userFilter === 'banned'} />
+        <StatCard icon={LogIn} label="Logins 24h" value={s?.logins24h ?? 0} tone="success" onClick={() => showLogins(false)} active={!onlyFailedLogins} />
+        <StatCard icon={XCircle} label="Falhas 24h" value={s?.failedLogins24h ?? 0} tone="danger" onClick={() => showLogins(true)} active={onlyFailedLogins} />
+        <StatCard icon={MonitorSmartphone} label="Dispositivos" value={s?.activeDevices ?? 0} onClick={() => showUsers('all')} />
       </div>
 
       {/* charts */}
@@ -471,11 +489,17 @@ export default function AdminPage() {
       })()}
 
       {/* recent logins */}
-      <div className="mt-md rounded-xl border border-slate-800 bg-slate-925 p-lg">
-        <p className="mb-sm text-xs font-semibold uppercase tracking-wide text-slate-500">Logins recentes (IP · SO · local)</p>
+      <div ref={loginsRef} className="mt-md scroll-mt-md rounded-xl border border-slate-800 bg-slate-925 p-lg">
+        <div className="mb-sm flex items-center gap-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Logins recentes (IP · SO · local)</p>
+          <button onClick={() => setOnlyFailedLogins((v) => !v)}
+            className={`ml-auto rounded-full border px-sm py-[1px] text-[10px] font-semibold ${onlyFailedLogins ? 'border-error-500/50 bg-error-500/10 text-error-300' : 'border-slate-700 text-slate-400 hover:text-slate-200'}`}>
+            {onlyFailedLogins ? 'Só falhas ✓' : 'Só falhas'}
+          </button>
+        </div>
         <div className="max-h-64 space-y-xs overflow-y-auto">
-          {(overview?.recentLogins ?? []).length === 0 && <p className="text-xs text-slate-500">Nenhum login ainda.</p>}
-          {(overview?.recentLogins ?? []).map((e) => (
+          {(overview?.recentLogins ?? []).filter((e) => !onlyFailedLogins || !e.success).length === 0 && <p className="text-xs text-slate-500">{onlyFailedLogins ? 'Nenhuma falha de login.' : 'Nenhum login ainda.'}</p>}
+          {(overview?.recentLogins ?? []).filter((e) => !onlyFailedLogins || !e.success).map((e) => (
             <div key={e.id} className="flex items-center gap-sm rounded-lg border border-slate-800 bg-slate-950 px-sm py-xs text-xs">
               {e.success ? <CheckCircle2 className="h-3 w-3 shrink-0 text-success-400" /> : <XCircle className="h-3 w-3 shrink-0 text-error-400" />}
               <span className="font-mono text-slate-300">{e.ip}</span>
@@ -488,9 +512,15 @@ export default function AdminPage() {
       </div>
 
       {/* users */}
-      <div className="mt-md rounded-xl border border-slate-800 bg-slate-925 p-lg">
-        <div className="mb-sm flex items-center gap-sm">
+      <div ref={usersRef} className="mt-md scroll-mt-md rounded-xl border border-slate-800 bg-slate-925 p-lg">
+        <div className="mb-sm flex flex-wrap items-center gap-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Usuários ({filtered.length})</p>
+          {userFilter !== 'all' && (
+            <button onClick={() => setUserFilter('all')}
+              className="flex items-center gap-xs rounded-full border border-primary-500/50 bg-primary-500/10 px-sm py-[1px] text-[10px] font-semibold text-primary-300 hover:bg-primary-500/20">
+              {userFilter === 'pending' ? 'Pendentes' : userFilter === 'admin' ? 'Admins' : userFilter === 'banned' ? 'Banidos' : 'Com cortes'} <X className="h-3 w-3" />
+            </button>
+          )}
           <div className="ml-auto flex items-center gap-xs rounded-lg border border-slate-700 bg-slate-900 px-sm">
             <Search className="h-3.5 w-3.5 text-slate-500" />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar e-mail, nome ou IP…"

@@ -10,28 +10,44 @@ const cloudIsLocal = CLOUD_API === LOCAL_API
 // Estado ÚNICO e compartilhado (evita corrida entre componentes que checavam o
 // backend em paralelo e discordavam — header dizia "No seu PC" e o gate pedia
 // instalar). Uma sonda por vez, com throttle.
-let apiBase = cloudIsLocal ? LOCAL_API : CLOUD_API
-let localUp = cloudIsLocal
+// Detecção GRUDENTA e PERSISTENTE: uma vez que o backend local é detectado, ele
+// não volta pra nuvem por uma falha isolada da sonda (chamar http://localhost de
+// um site https é intermitente). Só desiste após várias falhas seguidas. O estado
+// fica salvo, então na volta já começa local (sem chamar o Render por engano).
+const LS_KEY = 'cortes-backend-local'
+const savedLocal = (() => { try { return localStorage.getItem(LS_KEY) === '1' } catch { return false } })()
+let localUp = cloudIsLocal || savedLocal
+let apiBase = localUp ? LOCAL_API : CLOUD_API
+let failCount = 0
 let lastProbe = 0
 let probing: Promise<void> | null = null
 
 async function probeLocal(): Promise<void> {
   if (cloudIsLocal) { localUp = true; apiBase = LOCAL_API; return }
+  let ok = false
   try {
     const ctrl = new AbortController()
-    const t = setTimeout(() => ctrl.abort(), 1500)
-    const r = await fetch(`${LOCAL_API}/health`, { signal: ctrl.signal })
+    const t = setTimeout(() => ctrl.abort(), 2500)
+    const r = await fetch(`${LOCAL_API}/health`, { signal: ctrl.signal, cache: 'no-store' })
     clearTimeout(t)
     const j = r.ok ? await r.json().catch(() => ({} as { app?: string })) : {}
-    localUp = (j as { app?: string })?.app === 'cortes.digital'
-  } catch { localUp = false }
+    ok = (j as { app?: string })?.app === 'cortes.digital'
+  } catch { ok = false }
+  if (ok) {
+    failCount = 0; localUp = true
+    try { localStorage.setItem(LS_KEY, '1') } catch { /* */ }
+  } else {
+    failCount += 1
+    if (failCount >= 3) { localUp = false; try { localStorage.removeItem(LS_KEY) } catch { /* */ } }
+  }
   apiBase = localUp ? LOCAL_API : CLOUD_API
 }
 
 async function resolveBase(): Promise<string> {
   const now = Date.now()
   if (!probing && now - lastProbe > 3000) { lastProbe = now; probing = probeLocal().finally(() => { probing = null }) }
-  if (probing) await probing
+  // se já sabemos que é local (persistido), não bloqueia a request esperando a sonda
+  if (probing && !localUp) await probing
   return apiBase
 }
 const API_URL = () => apiBase
