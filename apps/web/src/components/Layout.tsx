@@ -3,6 +3,7 @@ import { Shield, LogOut } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useAuth } from '../AuthContext'
 import BackendStatus from './BackendStatus'
+import InstagramConnect from './InstagramConnect'
 
 export default function Layout({ children }: { children: ReactNode }) {
   const { profile, isAdmin, logout } = useAuth()
@@ -22,6 +23,7 @@ export default function Layout({ children }: { children: ReactNode }) {
           {/* right cluster */}
           <div className="ml-auto flex items-center gap-xs sm:gap-sm">
             <BackendStatus />
+            <InstagramConnect />
             {isAdmin && (
               <NavLink to="/admin" title="Painel de administração" className={({ isActive }) =>
                 `flex items-center gap-xs rounded-full border px-md py-xs text-xs font-semibold transition-colors ${

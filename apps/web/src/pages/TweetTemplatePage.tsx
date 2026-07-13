@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   AlertCircle, BadgeCheck, CheckCircle2, Download, FolderOpen, Link2, Loader2,
-  Package, Play, RotateCcw, Save, Search, ShieldCheck, Trash2, Upload, UserPlus, X,
+  Package, Play, RotateCcw, Save, Search, Trash2, Upload, UserPlus, X,
 } from 'lucide-react'
 import { api, isLocalBackend, type Clip, type JobStatus, type ProfileVideo } from '../api'
 import { Button, ClearableInput, useContextMenu } from '../components/ui'
-import InstagramConnect from '../components/InstagramConnect'
 
 type CardTheme = 'light' | 'dark'
 type CardMode = 'auto' | 'card' | 'reskin'
@@ -542,13 +541,8 @@ export default function TweetTemplatePage() {
           <p className="text-[10px] text-slate-500">Preview real — renderizado igual ao vídeo final</p>
         </div>
 
-        {/* config + batch */}
-        <div className="flex min-h-0 flex-1 flex-col gap-sm lg:overflow-hidden lg:pr-xs">
-          <div className="flex items-center gap-xs rounded-md border border-slate-800 bg-slate-900/50 px-sm py-xs text-[10px] text-slate-400">
-            <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-primary-400" />
-            <span>Tudo automático — fundo desfocado e card montado sozinho. Você só ajusta o perfil e as legendas.</span>
-          </div>
-
+        {/* campos (perfil/legenda/gancho) — coluna do meio, largura fixa */}
+        <div className="flex min-h-0 w-full flex-col gap-sm lg:w-[400px] lg:shrink-0 lg:overflow-y-auto lg:pr-sm">
           <div>
             <div className="mb-xs flex items-center justify-between">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Perfil</p>
@@ -638,9 +632,10 @@ export default function TweetTemplatePage() {
               className="w-full rounded-md border border-slate-700 bg-slate-800 px-sm py-xs text-xs text-slate-100 placeholder-slate-500" />
             <p className="mt-xs text-[10px] text-slate-500">O vídeo sai <span className="text-slate-300">menor e com moldura</span>; a faixa de gancho aparece no topo — deixa o corte diferente do original.</p>
           </div>
+        </div>
 
-          {/* videos */}
-          <div className="flex min-h-0 flex-1 flex-col">
+        {/* vídeos — coluna da direita (scroll vertical próprio) */}
+        <div className="flex min-h-0 w-full flex-col lg:flex-1 lg:overflow-hidden">
             <div className="mb-xs flex items-center justify-between">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                 Vídeos ({items.length}){importing && <Loader2 className="ml-xs inline h-3 w-3 animate-spin text-amber-400" />}
@@ -692,10 +687,6 @@ export default function TweetTemplatePage() {
               )
             })()}
 
-            <div className="mb-sm flex flex-wrap items-center gap-xs">
-              <InstagramConnect />
-              <span className="text-[10px] text-slate-500">Conecte o Instagram uma vez para baixar reels/perfis privados ou logados.</span>
-            </div>
 
             <div className="mb-sm flex gap-xs">
               <ClearableInput value={urlInput} onChange={setUrlInput}
@@ -775,7 +766,6 @@ export default function TweetTemplatePage() {
               ))}
             </div>
           </div>
-        </div>
       </div>
     </div>
   )
