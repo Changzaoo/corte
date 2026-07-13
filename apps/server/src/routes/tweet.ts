@@ -64,7 +64,7 @@ function optsFor(video: { path: string | null; width: number; height: number; du
     videoPath: video.path!, srcW: video.width, srcH: video.height, duration: video.duration,
     caption: caption || '',
     profile: { name: profile.name, handle: profile.handle, verified: profile.verified, avatarPath: avatarPath(profile.avatar_id) },
-    style: { card: style.card, hook: style.hook },
+    style: { card: style.card, hook: style.hook, bg: style.bg },
   }
 }
 

@@ -8,7 +8,7 @@ import { runFfmpeg } from './probe.js'
 const W = 1080, H = 1920
 
 export interface RenderProfile { name: string; handle: string; verified: boolean; avatarPath: string | null }
-export interface RenderStyle { card: 'light' | 'dark'; hook?: string }
+export interface RenderStyle { card: 'light' | 'dark'; hook?: string; bg?: string }
 export interface RenderOpts {
   videoPath: string; srcW: number; srcH: number; duration: number
   caption: string; profile: RenderProfile; style: RenderStyle
@@ -126,10 +126,16 @@ async function buildCard(opts: RenderOpts): Promise<{ cardPath: string; maskPath
   return { cardPath, maskPath, MW, MH, MX, MY }
 }
 
-function filterGraph(L: Layout): string {
+const isHexColor = (s?: string) => !!s && /^#?[0-9a-fA-F]{6}$/.test(s)
+
+function filterGraph(L: Layout, bg?: string): string {
   const { MW, MH, MX, MY } = L
+  // Fundo: 'blur' (desfoque do próprio vídeo) OU uma cor sólida (#RRGGBB).
+  const bgLayer = isHexColor(bg)
+    ? `color=c=0x${bg!.replace('#', '')}:s=${W}x${H}[bg]`
+    : `[0:v]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},gblur=sigma=26,eq=brightness=-0.28:saturation=1.08,setsar=1[bg]`
   return [
-    `[0:v]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},gblur=sigma=26,eq=brightness=-0.28:saturation=1.08,setsar=1[bg]`,
+    bgLayer,
     `[0:v]scale=${MW}:${MH}:force_original_aspect_ratio=increase,crop=${MW}:${MH},setsar=1[m0]`,
     `[2:v]scale=${MW}:${MH},format=gray[mk]`,
     `[m0][mk]alphamerge[med]`,
@@ -146,7 +152,7 @@ export async function renderTweetVideo(opts: RenderOpts, outPath: string): Promi
       '-i', opts.videoPath,
       '-loop', '1', '-i', L.cardPath,
       '-loop', '1', '-i', L.maskPath,
-      '-filter_complex', filterGraph(L),
+      '-filter_complex', filterGraph(L, opts.style.bg),
       '-map', '[vout]', '-map', '0:a?',
       '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p',
       '-c:a', 'aac', '-b:a', '128k', '-r', '30', '-shortest', '-movflags', '+faststart',
@@ -168,7 +174,7 @@ export async function renderTweetPreview(opts: RenderOpts): Promise<Buffer> {
       '-i', opts.videoPath,
       '-loop', '1', '-i', L.cardPath,
       '-loop', '1', '-i', L.maskPath,
-      '-filter_complex', filterGraph(L),
+      '-filter_complex', filterGraph(L, opts.style.bg),
       '-map', '[vout]', '-frames:v', '1', '-q:v', '3',
       outPath,
     ])

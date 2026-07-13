@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { useAuth } from '../AuthContext'
 import BackendStatus from './BackendStatus'
 import InstagramConnect from './InstagramConnect'
+import UpdateBanner from './UpdateBanner'
 
 export default function Layout({ children }: { children: ReactNode }) {
   const { profile, isAdmin, logout } = useAuth()
@@ -11,6 +12,7 @@ export default function Layout({ children }: { children: ReactNode }) {
 
   return (
     <div className="container-app mx-auto w-full max-w-[560px] border-x border-slate-850 bg-slate-950 sm:max-w-[720px] lg:max-w-none">
+      <UpdateBanner />
       {/* app bar */}
       <header className="sticky top-0 z-20 shrink-0 border-b border-slate-850 bg-slate-950/80 backdrop-blur-md">
         <div className="flex items-center gap-sm px-md py-sm sm:px-lg">

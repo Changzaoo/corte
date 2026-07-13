@@ -30,9 +30,26 @@ interface SavedProfile {
   avatarId: string | null
 }
 
-// Tudo automático: fundo sempre desfoque do próprio vídeo, card sempre claro.
-const BG_MODE = 'blur'
-const CARD_MODE: CardTheme = 'light'
+// Presets de fundo do card: desfoque do próprio vídeo OU uma cor sólida.
+const BG_PRESETS: { key: string; label: string; swatch: string }[] = [
+  { key: 'blur', label: 'Desfoque', swatch: 'linear-gradient(135deg,#1d9bf0,#0a0a0a)' },
+  { key: '#000000', label: 'Preto', swatch: '#000000' },
+  { key: '#0f1419', label: 'X escuro', swatch: '#0f1419' },
+  { key: '#1d9bf0', label: 'Azul', swatch: '#1d9bf0' },
+  { key: '#f4245e', label: 'Rosa', swatch: '#f4245e' },
+  { key: '#16a34a', label: 'Verde', swatch: '#16a34a' },
+  { key: '#7c3aed', label: 'Roxo', swatch: '#7c3aed' },
+  { key: '#ffffff', label: 'Branco', swatch: '#ffffff' },
+]
+
+// Hashtags virais do TikTok anexadas à legenda original (para viralizar).
+const VIRAL_TAGS = ['#fyp', '#foryou', '#foryoupage', '#viral', '#viralvideo', '#trending', '#tiktok']
+function buildViralCaption(original: string): string {
+  const base = (original || '').trim()
+  const existing = new Set((base.match(/#[\p{L}\p{N}_]+/gu) || []).map((t) => t.toLowerCase()))
+  const extra = VIRAL_TAGS.filter((t) => !existing.has(t.toLowerCase()))
+  return (base + (extra.length ? (base ? '\n\n' : '') + extra.join(' ') : '')).trim()
+}
 
 const CFG_KEY = 'vc-tweet-config'
 const ITEMS_KEY = 'vc-tweet-items'
@@ -58,16 +75,18 @@ export default function TweetTemplatePage() {
   const { toast } = useContextMenu()
   const cfg0 = loadCfg()
 
-  const [name, setName] = useState((cfg0.name as string) ?? 'Fut360')
-  const [handle, setHandle] = useState((cfg0.handle as string) ?? 'fut360')
+  const [name, setName] = useState((cfg0.name as string) ?? 'cortes.digital')
+  const [handle, setHandle] = useState((cfg0.handle as string) ?? 'cortesdigital')
   const [verified, setVerified] = useState((cfg0.verified as boolean) ?? true)
-  const bg = BG_MODE
-  const cardTheme = CARD_MODE
+  const [bg, setBg] = useState<string>((cfg0.bg as string) ?? 'blur')
+  const [cardTheme, setCardTheme] = useState<CardTheme>((cfg0.cardTheme as CardTheme) ?? 'light')
   const [avatarId, setAvatarId] = useState<string | null>((cfg0.avatarId as string) ?? null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(
     cfg0.avatarId ? api.tweetAvatarUrl(cfg0.avatarId as string) : null)
   const [defaultCaption, setDefaultCaption] = useState((cfg0.defaultCaption as string) ?? '')
   const [hook, setHook] = useState((cfg0.hook as string) ?? '')
+  // usar a legenda ORIGINAL do vídeo + hashtags virais (para o TikTok)
+  const [useOriginalCap, setUseOriginalCap] = useState<boolean>((cfg0.useOriginalCap as boolean) ?? true)
 
   const [profiles, setProfiles] = useState<SavedProfile[]>(loadProfiles)
   const [activeProfileId, setActiveProfileId] = useState<string | null>(
@@ -76,9 +95,9 @@ export default function TweetTemplatePage() {
   useEffect(() => {
     try {
       localStorage.setItem(CFG_KEY, JSON.stringify(
-        { name, handle, verified, avatarId, defaultCaption, hook, activeProfileId }))
+        { name, handle, verified, avatarId, defaultCaption, hook, activeProfileId, bg, cardTheme, useOriginalCap }))
     } catch { /* full */ }
-  }, [name, handle, verified, avatarId, defaultCaption, hook, activeProfileId])
+  }, [name, handle, verified, avatarId, defaultCaption, hook, activeProfileId, bg, cardTheme, useOriginalCap])
 
   useEffect(() => {
     try { localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles)) } catch { /* full */ }
@@ -272,12 +291,15 @@ export default function TweetTemplatePage() {
       thumb: v.thumbnail || null,
       videoId: null,
       status: 'baixando…',
-      caption: defaultCaption,
+      // legenda: a original do vídeo + hashtags virais, OU a legenda padrão
+      caption: useOriginalCap
+        ? buildViralCaption(v.caption || v.title || '')
+        : defaultCaption,
     }))
     setItems(prev => [...prev, ...newItems])
     setPreviewKey(k => k ?? newItems[0]?.key ?? null)
     newItems.forEach((it, i) => { void downloadUrlItem(it.key, vids[i]) })
-  }, [defaultCaption, downloadUrlItem])
+  }, [defaultCaption, useOriginalCap, downloadUrlItem])
 
   const probeUrl = async () => {
     const url = urlInput.trim()
@@ -618,11 +640,17 @@ export default function TweetTemplatePage() {
           </div>
 
           <div>
-            <p className="mb-xs text-[11px] font-semibold uppercase tracking-wide text-slate-500">Legenda padrão (aplicada aos novos vídeos)</p>
-            <textarea value={defaultCaption} onChange={(e) => setDefaultCaption(e.target.value)} rows={2}
-              placeholder="As ruas jamais esquecerão… 🥶  (deixe em branco para manter a legenda original do vídeo)"
-              className="w-full rounded-md border border-slate-700 bg-slate-800 px-sm py-xs text-xs text-slate-100 placeholder-slate-500" />
-            <p className="mt-xs text-[10px] text-slate-500">Em vídeos que já vêm com card, a legenda em branco <span className="text-slate-300">mantém a original</span>; preencher substitui.</p>
+            <p className="mb-xs text-[11px] font-semibold uppercase tracking-wide text-slate-500">Legenda</p>
+            <label className="mb-sm flex cursor-pointer items-start gap-xs rounded-md border border-slate-800 bg-slate-900/50 px-sm py-xs text-[11px] text-slate-300">
+              <input type="checkbox" checked={useOriginalCap} onChange={(e) => setUseOriginalCap(e.target.checked)} className="mt-[2px] accent-primary-500" />
+              <span>Usar a <span className="font-semibold text-slate-100">legenda original do vídeo</span> + hashtags virais do TikTok (<span className="text-primary-300">#fyp #viral…</span>) — ótimo para viralizar.</span>
+            </label>
+            {!useOriginalCap && <>
+              <textarea value={defaultCaption} onChange={(e) => setDefaultCaption(e.target.value)} rows={2}
+                placeholder="Legenda padrão dos novos vídeos… (vazio = mantém a legenda original)"
+                className="w-full rounded-md border border-slate-700 bg-slate-800 px-sm py-xs text-xs text-slate-100 placeholder-slate-500" />
+              <p className="mt-xs text-[10px] text-slate-500">Aplicada a cada novo vídeo; vazio mantém a original.</p>
+            </>}
           </div>
 
           <div>
@@ -631,6 +659,36 @@ export default function TweetTemplatePage() {
               placeholder="Ex.: ASSISTA ATÉ O FIM 👀  (deixe em branco para não mostrar faixa)"
               className="w-full rounded-md border border-slate-700 bg-slate-800 px-sm py-xs text-xs text-slate-100 placeholder-slate-500" />
             <p className="mt-xs text-[10px] text-slate-500">O vídeo sai <span className="text-slate-300">menor e com moldura</span>; a faixa de gancho aparece no topo — deixa o corte diferente do original.</p>
+          </div>
+
+          {/* estilo do card: tema (claro/escuro) + cor de fundo */}
+          <div>
+            <p className="mb-xs text-[11px] font-semibold uppercase tracking-wide text-slate-500">Estilo do card</p>
+            <div className="mb-sm flex items-center gap-xs">
+              <span className="text-[11px] text-slate-400">Tema:</span>
+              <button onClick={() => setCardTheme('light')}
+                className={`rounded-md border px-md py-xs text-xs ${cardTheme === 'light' ? 'border-primary-500 bg-primary-500/10 text-primary-200' : 'border-slate-700 text-slate-300 hover:bg-slate-800'}`}>Claro</button>
+              <button onClick={() => setCardTheme('dark')}
+                className={`rounded-md border px-md py-xs text-xs ${cardTheme === 'dark' ? 'border-primary-500 bg-primary-500/10 text-primary-200' : 'border-slate-700 text-slate-300 hover:bg-slate-800'}`}>Escuro</button>
+            </div>
+            <span className="text-[11px] text-slate-400">Fundo:</span>
+            <div className="mt-xs flex flex-wrap items-center gap-xs">
+              {BG_PRESETS.map((p) => (
+                <button key={p.key} onClick={() => setBg(p.key)} title={p.label}
+                  className={`h-8 w-8 rounded-full border-2 transition-transform hover:scale-110 ${bg === p.key ? 'border-primary-400 ring-2 ring-primary-500/40' : 'border-slate-700'}`}
+                  style={{ background: p.swatch }}>
+                  {p.key === 'blur' && <span className="text-[8px] font-bold text-white">blur</span>}
+                </button>
+              ))}
+              <label className="flex h-8 cursor-pointer items-center gap-xs rounded-full border border-slate-700 px-sm text-[11px] text-slate-300 hover:bg-slate-800" title="Cor personalizada">
+                <span className="h-4 w-4 rounded-full border border-slate-600" style={{ background: bg.startsWith('#') ? bg : '#888' }} />
+                cor
+                <input type="color" value={bg.startsWith('#') ? bg : '#000000'} onChange={(e) => setBg(e.target.value)} className="sr-only" />
+              </label>
+            </div>
+            <p className="mt-xs text-[10px] text-slate-500">
+              {bg === 'blur' ? 'Fundo = desfoque do próprio vídeo (mais transformativo).' : 'Fundo = cor sólida atrás do card.'}
+            </p>
           </div>
         </div>
 
