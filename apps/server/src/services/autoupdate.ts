@@ -15,7 +15,7 @@ const BOOT_DELAY_MS = 2 * 60_000     // primeira checagem 2min após subir
 const CHECK_MS = 4 * 3600_000        // depois a cada 4h
 
 /** Ocioso = nenhum job ativo e nenhum download de vídeo pela metade. */
-function isIdle(): boolean {
+export function isIdle(): boolean {
   for (const j of jobs.values())
     if (j.status === 'pending' || j.status === 'processing' || j.status === 'rendering') return false
   for (const v of videos.values())
@@ -48,6 +48,23 @@ async function checkOnce(): Promise<void> {
     fs.writeFileSync(path.join(root, 'update.req'), new Date().toISOString())
     console.log(`[autoupdate] versão nova ${latest.slice(0, 7)} (instalada: ${cur ? cur.slice(0, 7) : '?'}) — atualização solicitada ao watchdog`)
   } catch { /* melhor esforço — tenta de novo no próximo ciclo */ }
+}
+
+// Pedido manual com trabalho em andamento: espera ficar ocioso (checa a cada
+// 60s) e então grava o update.req — o clique do usuário não se perde.
+let pendingTimer: NodeJS.Timeout | null = null
+export function requestUpdateWhenIdle(): void {
+  if (pendingTimer) return
+  pendingTimer = setInterval(() => {
+    if (!isIdle()) return
+    if (pendingTimer) { clearInterval(pendingTimer); pendingTimer = null }
+    try {
+      const root = appDir()
+      if (!fs.existsSync(path.join(root, 'update.lock')))
+        fs.writeFileSync(path.join(root, 'update.req'), new Date().toISOString())
+    } catch { /* melhor esforço */ }
+  }, 60_000)
+  pendingTimer.unref()
 }
 
 export function startAutoUpdate(): void {

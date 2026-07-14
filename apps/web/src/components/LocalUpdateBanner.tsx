@@ -8,11 +8,13 @@ const SHA_API = 'https://api.github.com/repos/Changzaoo/corte/commits?path=apps%
 const CACHE_KEY = 'corte-latest-server-sha'
 const CACHE_MS = 10 * 60_000
 
-async function latestServerSha(): Promise<string | null> {
-  try {
-    const c = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null') as { sha: string; at: number } | null
-    if (c && Date.now() - c.at < CACHE_MS) return c.sha
-  } catch { /* */ }
+async function latestServerSha(fresh = false): Promise<string | null> {
+  if (!fresh) {
+    try {
+      const c = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null') as { sha: string; at: number } | null
+      if (c && Date.now() - c.at < CACHE_MS) return c.sha
+    } catch { /* */ }
+  }
   try {
     const r = await fetch(SHA_API, { headers: { Accept: 'application/vnd.github+json' } })
     if (!r.ok) return null
@@ -39,10 +41,16 @@ export default function LocalUpdateBanner() {
     let alive = true
     const check = async () => {
       if (!isLocalBackend()) { if (alive) setOutdated(false); return }
-      const latest = await latestServerSha()
+      let latest = await latestServerSha()
       try {
         const v = await api.systemVersion()
         if (!alive || !v.local) return
+        // mismatch pode ser cache velho (acabou de atualizar) — confirma com
+        // uma busca FRESCA antes de acusar desatualização
+        if (v.sha && latest && v.sha !== latest) {
+          latest = (await latestServerSha(true)) ?? latest
+          if (!alive) return
+        }
         remoteSha.current = latest
         setLegacy(false)
         // sem carimbo local (instalação antiga) também conta como desatualizado
@@ -79,8 +87,9 @@ export default function LocalUpdateBanner() {
         if (v.local && v.sha && v.sha === remoteSha.current) { ok = true; setDone(true); setOutdated(false); break }
       } catch { /* reiniciando… continua esperando */ }
     }
-    // não concluiu (ex.: antivírus bloqueou o updater) → oferece o instalador
-    if (!ok) setLegacy(true)
+    // não concluiu no prazo: pode estar só enfileirado atrás de um render —
+    // mantém o banner (dá pra tentar de novo); o update chega sozinho depois
+    if (!ok) setDismissed(false)
     setUpdating(false)
   }
 

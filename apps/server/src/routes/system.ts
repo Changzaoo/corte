@@ -6,6 +6,7 @@ import os from 'node:os'
 import { config } from '../config.js'
 import { requireAuth } from '../middleware/auth.js'
 import { appDir, installedSha } from '../util/version.js'
+import { isIdle, requestUpdateWhenIdle } from '../services/autoupdate.js'
 
 export const systemRouter = Router()
 
@@ -30,6 +31,12 @@ function watchdogAlive(root: string): boolean {
 systemRouter.post('/update', requireAuth, (_req, res) => {
   if (!config.localMode) return res.status(400).json({ error: 'Disponível apenas no app instalado no PC' })
   if (process.platform !== 'win32') return res.status(400).json({ error: 'Atualização automática só no Windows' })
+  // não mata um render/download no meio — o update reinicia o backend;
+  // fica agendado e começa sozinho assim que o trabalho terminar
+  if (!isIdle()) {
+    requestUpdateWhenIdle()
+    return res.status(202).json({ ok: true, message: 'Tem trabalho em andamento — a atualização começa sozinha assim que terminar' })
+  }
   const root = appDir()
   const script = path.join(root, 'scripts', 'update-corte.ps1')
   if (!fs.existsSync(script)) return res.status(500).json({ error: 'Script de atualização não encontrado' })

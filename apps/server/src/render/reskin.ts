@@ -39,9 +39,10 @@ const escXml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').rep
 // Extração de frames + leitura de pixels
 // ---------------------------------------------------------------------------
 
-async function grabFrame(videoPath: string, t: number, out: string): Promise<Frame | null> {
+async function grabFrame(videoPath: string, t: number, out: string, scaleW?: number): Promise<Frame | null> {
   try {
-    await runFfmpeg(['-ss', t.toFixed(2), '-i', videoPath, '-frames:v', '1', out])
+    const vf = scaleW ? ['-vf', `scale=${scaleW}:-2`] : []
+    await runFfmpeg(['-ss', t.toFixed(2), '-i', videoPath, ...vf, '-frames:v', '1', out])
     const { data, info } = await sharp(out).removeAlpha().raw().toBuffer({ resolveWithObject: true })
     return { data: data as Buffer, w: info.width, h: info.height }
   } catch {
@@ -50,6 +51,10 @@ async function grabFrame(videoPath: string, t: number, out: string): Promise<Fra
     fs.rm(out, () => {})
   }
 }
+
+// A análise roda no event loop do node — cede a vez entre etapas pesadas para
+// o backend não ficar surdo (site lento) durante a detecção.
+const yieldLoop = () => new Promise<void>((r) => setImmediate(r))
 
 // ---- helpers de pixel (frame RGB contíguo, 3 canais) ----------------------
 function maxChanDiff(a: Frame, b: Frame, i: number): number {
@@ -133,15 +138,23 @@ let medR = new Float64Array(0), medG = new Float64Array(0), medB = new Float64Ar
 // Detecção do card embutido
 // ---------------------------------------------------------------------------
 export async function detectExistingCard(videoPath: string): Promise<ReskinLayout | null> {
-  let dur = 0
-  try { dur = (await probeVideo(videoPath)).duration } catch { return null }
-  if (dur <= 0.5) return null
+  let dur = 0, origW = 0, origH = 0
+  try {
+    const p = await probeVideo(videoPath)
+    dur = p.duration; origW = p.width; origH = p.height
+  } catch { return null }
+  if (dur <= 0.5 || !origW || !origH) return null
   const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), 'vc_reskin_det_'))
   try {
+    // detecta em RESOLUÇÃO REDUZIDA (~5x menos pixels que 1080p): os loops de
+    // pixel são JS puro no event loop — em full-res o backend travava segundos
+    // por vídeo e o site inteiro ficava lento. Coordenadas voltam à escala
+    // original no final.
+    const scaleW = Math.min(640, origW)
     const times = [0.15, 0.35, 0.55, 0.75, 0.9].map((f) => Math.max(0.1, dur * f))
     const frames: Frame[] = []
     for (let i = 0; i < times.length; i++) {
-      const f = await grabFrame(videoPath, times[i], path.join(tmpdir, `det_${i}.png`))
+      const f = await grabFrame(videoPath, times[i], path.join(tmpdir, `det_${i}.png`), scaleW)
       if (f) frames.push(f)
     }
     if (frames.length < 3) return null
@@ -164,6 +177,7 @@ export async function detectExistingCard(videoPath: string): Promise<ReskinLayou
       }
       for (let y = 0; y < H; y++) if (rowCnt[y] / W > 0.03) rowHits[y]++
       for (let x = 0; x < W; x++) if (colCnt[x] / H > 0.03) colHits[x]++
+      await yieldLoop()   // deixa o backend responder HTTP entre os pares
     }
     const need = Math.max(2, Math.floor((nPairs + 1) / 2))
     const rows: number[] = [], cols: number[] = []
@@ -312,11 +326,20 @@ export async function detectExistingCard(videoPath: string): Promise<ReskinLayou
     }
 
     const refBg = (branding || cap!).bg
+    // volta as coordenadas para a escala ORIGINAL do vídeo (detecção foi
+    // feita em resolução reduzida)
+    const sx = origW / W, sy = origH / H
+    const zx = (z: Zone): Zone => ({
+      y0: Math.round(z.y0 * sy), y1: Math.round(z.y1 * sy),
+      x0: Math.round(z.x0 * sx), x1: Math.round(z.x1 * sx), bg: z.bg,
+    })
     return {
-      w: W, h: H, videoTop: vy0, videoBottom: vy1, bg: refBg,
-      branding, caption: cap,
-      labels: labels.map(([a, b]) => ({ y0: a, y1: b })),
-      bottom,
+      w: origW, h: origH,
+      videoTop: Math.round(vy0 * sy), videoBottom: Math.round(vy1 * sy), bg: refBg,
+      branding: branding ? zx(branding) : null,
+      caption: cap ? zx(cap) : null,
+      labels: labels.map(([a, b]) => ({ y0: Math.round(a * sy), y1: Math.round(b * sy) })),
+      bottom: bottom.map(zx),
     }
   } catch (e) {
     return null
