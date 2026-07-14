@@ -59,6 +59,26 @@ begin
     'Aguarde enquanto preparamos tudo no seu computador.');
 end;
 
+{ Para o backend que ja estiver rodando ANTES de copiar os arquivos.
+  Sem isso, o node antigo segura a porta 4000, o novo morre ao subir e o
+  usuario fica preso na versao velha mesmo apos reinstalar. }
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  Code: Integer;
+  Kill: String;
+begin
+  Result := '';
+  Kill := 'Get-CimInstance Win32_Process -Filter "Name=''node.exe''" | ' +
+          'Where-Object { $_.CommandLine -like ''*cortes.digital*'' } | ' +
+          'ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }; ' +
+          'Start-Sleep -Seconds 1';
+  SaveStringToFile(ExpandConstant('{tmp}\kill-corte.ps1'), Kill, False);
+  Exec('powershell.exe',
+    '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' +
+    ExpandConstant('{tmp}\kill-corte.ps1') + '"',
+    '', SW_HIDE, ewWaitUntilTerminated, Code);
+end;
+
 function RunStep(Step, StatusText: String; FromP, ToP: Integer): Boolean;
 var
   Code: Integer;

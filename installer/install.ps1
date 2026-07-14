@@ -63,6 +63,15 @@ switch ($Step) {
     Pop-Location
   }
   'start' {
+    # garante que nenhum backend antigo continue segurando a porta 4000
+    try {
+      Get-CimInstance Win32_Process -Filter "Name='node.exe'" | ForEach-Object {
+        if ($_.CommandLine -and $_.CommandLine.ToLower().Contains($AppDir.ToLower())) {
+          try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch {}
+        }
+      }
+      Start-Sleep -Seconds 1
+    } catch {}
     $node = (Get-Command node -ErrorAction SilentlyContinue).Source
     if (-not $node) { Refresh-Path; $node = (Get-Command node).Source }
     $serverJs = Join-Path $AppDir 'apps\server\dist\src\index.js'
