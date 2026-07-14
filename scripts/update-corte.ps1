@@ -32,6 +32,8 @@ function Refresh-Path {
 $tmp = $null
 try {
   Log "== atualizacao iniciada =="
+  # consome qualquer pedido pendente (senao o watchdog novo repetiria o update)
+  Remove-Item (Join-Path $AppDir 'update.req') -Force -ErrorAction SilentlyContinue
 
   # 1) sha mais novo (para carimbar a versao). Falha da API nao impede o update.
   $sha = $null

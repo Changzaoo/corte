@@ -71,13 +71,16 @@ export default function LocalUpdateBanner() {
     try { await api.systemUpdate() } catch { /* o servidor morre no meio — esperado */ }
     // aguarda o backend voltar com o sha novo (o update leva alguns minutos)
     const t0 = Date.now()
-    while (Date.now() - t0 < 8 * 60_000) {
+    let ok = false
+    while (Date.now() - t0 < 5 * 60_000) {
       await new Promise((r) => setTimeout(r, 10_000))
       try {
         const v = await api.systemVersion()
-        if (v.local && v.sha && v.sha === remoteSha.current) { setDone(true); setOutdated(false); break }
+        if (v.local && v.sha && v.sha === remoteSha.current) { ok = true; setDone(true); setOutdated(false); break }
       } catch { /* reiniciando… continua esperando */ }
     }
+    // não concluiu (ex.: antivírus bloqueou o updater) → oferece o instalador
+    if (!ok) setLegacy(true)
     setUpdating(false)
   }
 

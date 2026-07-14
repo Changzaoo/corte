@@ -77,8 +77,9 @@ switch ($Step) {
       }
       Start-Sleep -Seconds 1
     } catch {}
-    # limpa um update.lock orfao (impediria o watchdog de religar o backend)
+    # limpa lock/pedido orfaos (impediriam/repetiriam um update)
     Remove-Item (Join-Path $AppDir 'update.lock') -Force -ErrorAction SilentlyContinue
+    Remove-Item (Join-Path $AppDir 'update.req') -Force -ErrorAction SilentlyContinue
     Refresh-Path
     # o vbs roda o WATCHDOG (que mantem o node vivo e religa se ele cair)
     $watchdog = Join-Path $AppDir 'scripts\watchdog.ps1'
