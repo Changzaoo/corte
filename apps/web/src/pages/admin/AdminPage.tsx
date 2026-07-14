@@ -22,6 +22,13 @@ function timeAgo(iso: string | null): string {
   return `${Math.floor(s / 86400)}d`
 }
 
+// Velocidade em Mbps → texto amigável (com o tipo de conexão do navegador, se houver)
+function fmtMbps(mbps: number | null | undefined, effectiveType?: string | null): string {
+  if (mbps == null || !Number.isFinite(mbps)) return '—'
+  const val = mbps >= 100 ? Math.round(mbps).toString() : mbps.toFixed(1).replace(/\.0$/, '')
+  return `${val} Mbps${effectiveType ? ` (${effectiveType})` : ''}`
+}
+
 function StatCard({ icon: Icon, label, value, tone = 'default', onClick, active }: {
   icon: typeof Users; label: string; value: number | string
   tone?: 'default' | 'danger' | 'success' | 'primary'
@@ -170,6 +177,10 @@ function UserDrawer({ uid, onClose, onChanged }: {
                   <Row label="Último SO" value={u.lastOs || '—'} />
                   <Row label="Navegador" value={u.lastBrowser || '—'} />
                   <Row label="Total de logins" value={String(u.loginCount)} />
+                  <Row label="Velocidade média" value={fmtMbps(u.netAvgMbps, u.netEffectiveType)} />
+                  <Row label="Download" value={fmtMbps(u.netDownMbps)} />
+                  <Row label="Upload" value={fmtMbps(u.netUpMbps)} />
+                  <Row label="Latência" value={u.netRttMs != null ? `${u.netRttMs} ms` : '—'} />
                   <Row label="Criado" value={timeAgo(u.createdAt)} />
                   <Row label="Último login" value={timeAgo(u.lastLoginAt)} />
                   <Row label="Acesso" value={u.approved

@@ -6,6 +6,7 @@ import {
 } from 'firebase/auth'
 import { auth, googleProvider } from './firebase'
 import { api, type MeProfile } from './api'
+import { initNetSpeed } from './netspeed'
 
 interface AuthState {
   user: User | null
@@ -36,7 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
       setUser(u)
-      if (u) await loadProfile()
+      if (u) { await loadProfile(); initNetSpeed() }
       else setProfile(null)
       setLoading(false)
     })

@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { requireAuth } from '../middleware/auth.js'
-import { recordLogin, touchDevice, loadUserDetails, isApproved } from '../services/sessions.js'
+import { recordLogin, touchDevice, loadUserDetails, isApproved, recordNetSpeed } from '../services/sessions.js'
 import { config } from '../config.js'
 
 export const meRouter = Router()
@@ -26,6 +26,18 @@ meRouter.post('/session', async (req, res) => {
   const u = res.locals.user!
   const method = typeof req.body?.method === 'string' ? req.body.method : 'session'
   await recordLogin(req, u.record, { method, success: true })
+  res.status(204).end()
+})
+
+// Telemetria de velocidade de rede (passiva): média (estimativa do navegador),
+// upload e download reais medidos do tráfego do app. Best-effort.
+meRouter.post('/netspeed', async (req, res) => {
+  const u = res.locals.user!
+  const b = req.body || {}
+  await recordNetSpeed({ uid: u.uid, email: u.email }, {
+    avgMbps: b.avgMbps, downMbps: b.downMbps, upMbps: b.upMbps,
+    rttMs: b.rttMs, effectiveType: b.effectiveType,
+  })
   res.status(204).end()
 })
 

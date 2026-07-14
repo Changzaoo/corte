@@ -58,13 +58,19 @@ function avatarPath(avatarId: string | null): string | null {
   return fs.existsSync(p) ? p : null
 }
 
+function normMode(m?: string): 'auto' | 'card' | 'reskin' {
+  return m === 'card' || m === 'reskin' ? m : 'auto'
+}
+
 function optsFor(video: { path: string | null; width: number; height: number; duration: number },
-  caption: string, profile: z.infer<typeof profileSchema>, style: z.infer<typeof styleSchema>): RenderOpts {
+  caption: string, profile: z.infer<typeof profileSchema>, style: z.infer<typeof styleSchema>,
+  cardMode?: string): RenderOpts {
   return {
     videoPath: video.path!, srcW: video.width, srcH: video.height, duration: video.duration,
     caption: caption || '',
     profile: { name: profile.name, handle: profile.handle, verified: profile.verified, avatarPath: avatarPath(profile.avatar_id) },
     style: { card: style.card, hook: style.hook, bg: style.bg },
+    cardMode: normMode(cardMode),
   }
 }
 
@@ -81,7 +87,7 @@ tweetRouter.post('/preview', async (req, res, next) => {
     const v = videos.get(body.video_id)
     if (!v || v.owner !== res.locals.user!.uid || !v.path || !v.ready)
       return res.status(400).json({ error: 'Vídeo não está pronto' })
-    const buf = await renderTweetPreview(optsFor(v, body.caption, body.profile, body.style))
+    const buf = await renderTweetPreview(optsFor(v, body.caption, body.profile, body.style, body.card_mode))
     res.setHeader('Content-Type', 'image/jpeg')
     res.setHeader('Cache-Control', 'no-store')
     res.end(buf)
@@ -123,7 +129,7 @@ tweetRouter.post('/render', async (req, res, next) => {
         const out = path.join(OUTPUT_DIR, `tweet_${job.id}_${i + 1}.mp4`)
         try {
           updateJob(job.id, { stageDetail: `Renderizando ${i + 1}/${body.items.length}` })
-          await renderTweetVideo(optsFor(v, it.caption, body.profile, body.style), out)
+          await renderTweetVideo(optsFor(v, it.caption, body.profile, body.style, it.card_mode), out)
           const title = it.caption?.trim() || v.title
           newClip(owner, job.id, v.id, title, out)
           done++

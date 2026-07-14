@@ -26,6 +26,9 @@ app.use(helmet({
 // app cairia no servidor da nuvem. Precisa vir antes do CORS/preflight.
 app.use((_req, res, next) => {
   res.setHeader('Access-Control-Allow-Private-Network', 'true')
+  // expõe timing de recursos cross-origin ao app (só métricas de tempo/tamanho,
+  // não o conteúdo) → telemetria passiva de velocidade de download no navegador.
+  res.setHeader('Timing-Allow-Origin', '*')
   next()
 })
 

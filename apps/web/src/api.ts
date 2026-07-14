@@ -1,5 +1,6 @@
 import { auth } from './firebase'
 import { getDeviceId, getDeviceName } from './device'
+import { recordUploadSample } from './netspeed'
 
 // Base da API. Se o backend local (instalado no PC do usuário) estiver de pé,
 // tudo passa a rodar nele — download, render e entrega no próprio computador.
@@ -114,6 +115,8 @@ export interface AdminUser {
   role: Role; banned: boolean; disabled: boolean; createdAt: string | null
   lastLoginAt: string | null; lastIp: string | null; lastOs: string | null
   lastBrowser: string | null; loginCount: number; cutsTotal: number; approved: boolean
+  netAvgMbps?: number | null; netDownMbps?: number | null; netUpMbps?: number | null
+  netRttMs?: number | null; netEffectiveType?: string | null; netMeasuredAt?: string | null
 }
 export interface AdminOverview {
   stats: {
@@ -177,12 +180,23 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 async function upload<T>(path: string, fd: FormData): Promise<T> {
   const base = await baseFor(path)
   const headers = await authHeaders()
+  // telemetria passiva de UPLOAD: mede bytes/tempo do envio real (avatar/vídeo)
+  const bytes = fdByteSize(fd)
+  const t0 = perfNow()
   const res = await fetch(`${base}${path}`, { method: 'POST', headers, body: fd })
+  if (bytes > 200_000) recordUploadSample(bytes, perfNow() - t0)
   if (!res.ok) {
     const e = await res.json().catch(() => ({ detail: 'Erro' }))
     throw new Error(e.detail || `HTTP ${res.status}`)
   }
   return res.json()
+}
+
+const perfNow = () => (typeof performance !== 'undefined' ? performance.now() : Date.now())
+function fdByteSize(fd: FormData): number {
+  let n = 0
+  try { for (const [, v] of fd as unknown as Iterable<[string, FormDataEntryValue]>) n += v instanceof Blob ? v.size : String(v).length } catch { /* */ }
+  return n
 }
 
 export const api = {
@@ -192,6 +206,8 @@ export const api = {
   getMe: () => request<MeProfile>('GET', '/api/me'),
   getMySessions: () => request<{ devices: DeviceRecord[]; loginEvents: LoginEvent[] }>('GET', '/api/me/sessions'),
   recordLogin: (method: string) => request<void>('POST', '/api/me/session', { method }),
+  reportNetSpeed: (d: { avgMbps?: number | null; downMbps?: number | null; upMbps?: number | null; rttMs?: number | null; effectiveType?: string | null }) =>
+    request<void>('POST', '/api/me/netspeed', d),
 
   // ---- admin ---------------------------------------------------------------
   adminOverview: () => request<AdminOverview>('GET', '/api/admin/overview'),

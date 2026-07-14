@@ -5,7 +5,6 @@ import {
 } from 'lucide-react'
 import { api, isLocalBackend, type Clip, type JobStatus, type ProfileVideo } from '../api'
 import { Button, ClearableInput, useContextMenu } from '../components/ui'
-import CardMockPreview from '../components/CardMockPreview'
 
 type CardTheme = 'light' | 'dark'
 type CardMode = 'auto' | 'card' | 'reskin'
@@ -560,9 +559,9 @@ export default function TweetTemplatePage() {
                 <Loader2 className="h-4 w-4 animate-spin" /> baixando o vídeo…
               </div>
             ) : (
-              <CardMockPreview bg={bg} cardTheme={cardTheme} name={name} handle={handle} verified={verified}
-                avatar={avatarPreview} hook={hook}
-                caption={useOriginalCap ? 'Legenda original do vídeo\n\n#fyp #viral #foryou' : defaultCaption} />
+              <div className="flex aspect-[9/16] w-full flex-col items-center justify-center gap-xs p-4 text-center text-[11px] text-slate-500">
+                Adicione um vídeo para ver o preview real
+              </div>
             )}
           </div>
           <p className="text-[10px] text-slate-500">Preview real — renderizado igual ao vídeo final</p>

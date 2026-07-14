@@ -87,6 +87,32 @@ export async function recordLogin(
   }
 }
 
+/** Telemetria de rede: velocidade média (estimativa do navegador) + upload e
+ *  download reais medidos passivamente do tráfego do app. Best-effort. */
+export async function recordNetSpeed(
+  user: { uid: string; email: string | null },
+  data: { avgMbps?: number | null; downMbps?: number | null; upMbps?: number | null; rttMs?: number | null; effectiveType?: string | null },
+): Promise<void> {
+  const clamp = (v: unknown): number | null => {
+    const n = typeof v === 'number' ? v : Number(v)
+    return Number.isFinite(n) && n >= 0 && n <= 10000 ? Math.round(n * 10) / 10 : null
+  }
+  const patch: Record<string, unknown> = { netMeasuredAt: nowIso() }
+  const avg = clamp(data.avgMbps), down = clamp(data.downMbps), up = clamp(data.upMbps), rtt = clamp(data.rttMs)
+  if (avg != null) patch.netAvgMbps = avg
+  if (down != null) patch.netDownMbps = down
+  if (up != null) patch.netUpMbps = up
+  if (rtt != null) patch.netRttMs = Math.round(rtt)
+  if (typeof data.effectiveType === 'string') patch.netEffectiveType = data.effectiveType.slice(0, 8)
+  // nada útil além do timestamp → não escreve
+  if (Object.keys(patch).length <= 1) return
+  try {
+    await db.collection('users').doc(user.uid).set({ email: user.email || null, ...patch }, { merge: true })
+  } catch (e) {
+    console.warn('[sessions] recordNetSpeed failed:', (e as Error).message)
+  }
+}
+
 /** Record a render/"corte" event: how many cuts, which profile, and the
  *  source links used. Best-effort (Firestore). Also bumps a cheap per-user
  *  counter so the users list can show totals without scanning events. */
@@ -286,6 +312,9 @@ export async function loadUserDetails(uid: string) {
       createdAt: u.metadata.creationTime || null, lastLoginAt: u.metadata.lastSignInTime || summary.lastLoginAt || null,
       lastIp: summary.lastIp || null, lastOs: summary.lastOs || null, lastBrowser: summary.lastBrowser || null,
       loginCount: summary.loginCount || 0,
+      netAvgMbps: summary.netAvgMbps ?? null, netDownMbps: summary.netDownMbps ?? null,
+      netUpMbps: summary.netUpMbps ?? null, netRttMs: summary.netRttMs ?? null,
+      netEffectiveType: summary.netEffectiveType ?? null, netMeasuredAt: summary.netMeasuredAt ?? null,
     },
     loginEvents: loginEvents.map((e) => ({
       id: e.id, loginAt: e.loginAt, ip: e.ip, os: e.os, browser: e.browser, deviceType: e.deviceType,

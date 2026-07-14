@@ -4,14 +4,17 @@ import crypto from 'node:crypto'
 import sharp from 'sharp'
 import { TMP_DIR } from '../store.js'
 import { runFfmpeg } from './probe.js'
+import { detectExistingCard, buildReskinOverlay, composeReskinVideo, composeReskinFrame } from './reskin.js'
 
 const W = 1080, H = 1920
 
+export type CardMode = 'auto' | 'card' | 'reskin'
 export interface RenderProfile { name: string; handle: string; verified: boolean; avatarPath: string | null }
 export interface RenderStyle { card: 'light' | 'dark'; hook?: string; bg?: string }
 export interface RenderOpts {
   videoPath: string; srcW: number; srcH: number; duration: number
   caption: string; profile: RenderProfile; style: RenderStyle
+  cardMode?: CardMode
 }
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
@@ -144,8 +147,29 @@ function filterGraph(L: Layout, bg?: string): string {
   ].join(';')
 }
 
+/** Reskin (troca só o perfil num card já embutido no vídeo) quando o modo pede
+ *  e a detecção encontra um card. Retorna o PNG do overlay + layout, ou null. */
+async function tryReskin(opts: RenderOpts): Promise<{ overlayPath: string } | null> {
+  const mode = opts.cardMode || 'auto'
+  if (mode === 'card') return null
+  const layout = await detectExistingCard(opts.videoPath)
+  if (!layout) return null
+  const overlayPath = await buildReskinOverlay(
+    layout,
+    { name: opts.profile.name, handle: opts.profile.handle, verified: opts.profile.verified },
+    opts.profile.avatarPath, opts.caption, TMP_DIR,
+  )
+  return { overlayPath }
+}
+
 /** Full render → mp4 at outPath. */
 export async function renderTweetVideo(opts: RenderOpts, outPath: string): Promise<void> {
+  const rs = await tryReskin(opts)
+  if (rs) {
+    try { await composeReskinVideo(opts.videoPath, rs.overlayPath, outPath) }
+    finally { fs.rm(rs.overlayPath, () => {}) }
+    return
+  }
   const L = await buildCard(opts)
   try {
     await runFfmpeg([
@@ -165,9 +189,19 @@ export async function renderTweetVideo(opts: RenderOpts, outPath: string): Promi
 
 /** Single frame → jpeg buffer (identical pipeline as the final video). */
 export async function renderTweetPreview(opts: RenderOpts): Promise<Buffer> {
+  const still = opts.duration > 1 ? Math.min(opts.duration * 0.5, opts.duration - 0.2) : 0
+  const rs = await tryReskin(opts)
+  if (rs) {
+    const out = path.join(TMP_DIR, `prev_${crypto.randomBytes(6).toString('hex')}.jpg`)
+    try {
+      await composeReskinFrame(opts.videoPath, rs.overlayPath, still, out)
+      return await fs.promises.readFile(out)
+    } finally {
+      fs.rm(rs.overlayPath, () => {}); fs.rm(out, () => {})
+    }
+  }
   const L = await buildCard(opts)
   const outPath = path.join(TMP_DIR, `prev_${crypto.randomBytes(6).toString('hex')}.jpg`)
-  const still = opts.duration > 1 ? Math.min(opts.duration * 0.5, opts.duration - 0.2) : 0
   try {
     await runFfmpeg([
       ...(still > 0 ? ['-ss', still.toFixed(2)] : []),
