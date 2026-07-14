@@ -63,8 +63,13 @@ switch ($Step) {
     Pop-Location
   }
   'start' {
-    # garante que nenhum backend antigo continue segurando a porta 4000
+    # garante que nenhum backend/watchdog antigo continue rodando (porta 4000)
     try {
+      Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | ForEach-Object {
+        if ($_.CommandLine -and $_.CommandLine.ToLower().Contains('watchdog.ps1')) {
+          try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch {}
+        }
+      }
       Get-CimInstance Win32_Process -Filter "Name='node.exe'" | ForEach-Object {
         if ($_.CommandLine -and $_.CommandLine.ToLower().Contains($AppDir.ToLower())) {
           try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch {}
@@ -72,12 +77,14 @@ switch ($Step) {
       }
       Start-Sleep -Seconds 1
     } catch {}
-    $node = (Get-Command node -ErrorAction SilentlyContinue).Source
-    if (-not $node) { Refresh-Path; $node = (Get-Command node).Source }
-    $serverJs = Join-Path $AppDir 'apps\server\dist\src\index.js'
+    # limpa um update.lock orfao (impediria o watchdog de religar o backend)
+    Remove-Item (Join-Path $AppDir 'update.lock') -Force -ErrorAction SilentlyContinue
+    Refresh-Path
+    # o vbs roda o WATCHDOG (que mantem o node vivo e religa se ele cair)
+    $watchdog = Join-Path $AppDir 'scripts\watchdog.ps1'
     $vbs = Join-Path $AppDir 'corte-run.vbs'
     $q = [char]34; $dq = "$q$q"
-    $runArg = "$dq$node$dq $dq$serverJs$dq"
+    $runArg = "powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File $dq$watchdog$dq -AppDir $dq$AppDir$dq"
     @(
       'Set sh = CreateObject("WScript.Shell")'
       "sh.CurrentDirectory = $q$AppDir$q"

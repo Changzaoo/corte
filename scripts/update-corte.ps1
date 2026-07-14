@@ -51,8 +51,20 @@ try {
   $src = Join-Path $tmp 'corte-main'
   if (-not (Test-Path (Join-Path $src 'package.json'))) { throw "zip extraido nao tem package.json em $src" }
 
-  # 3) para o backend (o pid vem do proprio servidor que disparou o update;
-  #    por garantia, mata tambem qualquer node rodando o dist deste AppDir)
+  # 3) sinaliza o update ANTES de derrubar: o watchdog ve o update.lock e para
+  #    de religar o backend enquanto trocamos os arquivos
+  $lockFile = Join-Path $AppDir 'update.lock'
+  'updating' | Set-Content -Path $lockFile -Encoding ascii
+
+  # para o watchdog e o backend (o pid vem do proprio servidor que disparou o
+  # update; por garantia, mata tambem qualquer node rodando o dist deste AppDir)
+  try {
+    Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | ForEach-Object {
+      if ($_.CommandLine -and $_.CommandLine.ToLower().Contains('watchdog.ps1')) {
+        try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop; Log "watchdog (pid $($_.ProcessId)) parado" } catch {}
+      }
+    }
+  } catch { Log "aviso: varredura de watchdogs falhou: $($_.Exception.Message)" }
   if ($ServerPid -gt 0) {
     try { Stop-Process -Id $ServerPid -Force -ErrorAction Stop; Log "servidor (pid $ServerPid) parado" } catch { Log "pid $ServerPid ja estava parado" }
   }
@@ -91,7 +103,8 @@ try {
     Log "versao carimbada: $sha"
   }
 
-  # 7) religa o backend (mesmo vbs do instalador / autostart)
+  # 7) libera o watchdog e religa o backend (mesmo vbs do instalador / autostart)
+  Remove-Item $lockFile -Force -ErrorAction SilentlyContinue
   $vbs = Join-Path $AppDir 'corte-run.vbs'
   if (Test-Path $vbs) { & wscript.exe $vbs; Log "backend religado" }
   else { Log "aviso: corte-run.vbs nao encontrado - religue manualmente" }
@@ -100,6 +113,7 @@ try {
 } catch {
   Log "ERRO: $($_.Exception.Message)"
   # tenta religar mesmo apos falha, para nao deixar o usuario sem backend
+  Remove-Item (Join-Path $AppDir 'update.lock') -Force -ErrorAction SilentlyContinue
   $vbs = Join-Path $AppDir 'corte-run.vbs'
   if (Test-Path $vbs) { try { & wscript.exe $vbs; Log "backend religado apos erro" } catch {} }
   exit 1

@@ -79,7 +79,12 @@ export function ClearableInput({
 // ---------------------------------------------------------------------------
 type ToastKind = 'info' | 'success' | 'error'
 interface ToastItem { id: number; text: string; kind: ToastKind }
-interface ContextMenuValue { toast: (text: string, kind?: ToastKind) => void }
+interface ConfirmOpts { title?: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean }
+interface ContextMenuValue {
+  toast: (text: string, kind?: ToastKind) => void
+  // substitui o window.confirm por um diálogo DENTRO do app (mesmo visual)
+  confirm: (message: string, opts?: ConfirmOpts) => Promise<boolean>
+}
 
 const ContextMenuContext = createContext<ContextMenuValue | null>(null)
 
@@ -90,9 +95,32 @@ export function ContextMenuProvider({ children }: { children: ReactNode }) {
     setToasts((t) => [...t, { id, text, kind }])
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3800)
   }, [])
+  const [ask, setAsk] = useState<{ message: string; opts: ConfirmOpts; resolve: (v: boolean) => void } | null>(null)
+  const confirm = useCallback((message: string, opts: ConfirmOpts = {}) =>
+    new Promise<boolean>((resolve) => setAsk({ message, opts, resolve })), [])
+  const answer = (v: boolean) => { ask?.resolve(v); setAsk(null) }
   return (
-    <ContextMenuContext.Provider value={{ toast }}>
+    <ContextMenuContext.Provider value={{ toast, confirm }}>
       {children}
+      {ask && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-md backdrop-blur-sm"
+          onClick={() => answer(false)}
+          onKeyDown={(e) => { if (e.key === 'Escape') answer(false) }}>
+          <div role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-900 p-lg shadow-2xl animate-fadeInUp">
+            {ask.opts.title && <p className="mb-xs text-sm font-bold text-slate-50">{ask.opts.title}</p>}
+            <p className="text-sm text-slate-200">{ask.message}</p>
+            <div className="mt-lg flex justify-end gap-sm">
+              <Button variant="secondary" size="sm" onClick={() => answer(false)}>
+                {ask.opts.cancelLabel || 'Cancelar'}
+              </Button>
+              <Button variant={ask.opts.danger ? 'danger' : 'primary'} size="sm" autoFocus onClick={() => answer(true)}>
+                {ask.opts.confirmLabel || 'OK'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="pointer-events-none fixed bottom-4 right-4 z-[100] flex flex-col gap-sm">
         {toasts.map((t) => (
           <div key={t.id}
@@ -112,6 +140,6 @@ export function ContextMenuProvider({ children }: { children: ReactNode }) {
 
 export function useContextMenu(): ContextMenuValue {
   const ctx = useContext(ContextMenuContext)
-  if (!ctx) return { toast: () => {} }
+  if (!ctx) return { toast: () => {}, confirm: async () => window.confirm('Confirmar?') }
   return ctx
 }

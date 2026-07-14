@@ -72,7 +72,7 @@ const newProfileId = () => `${Date.now().toString(36)}${Math.random().toString(3
 /** "Template": renders videos inside an X/Twitter-style post card — editable
  *  avatar, name, @handle, verified badge and caption; single video or a batch. */
 export default function TweetTemplatePage() {
-  const { toast } = useContextMenu()
+  const { toast, confirm: confirmDialog } = useContextMenu()
   const cfg0 = loadCfg()
 
   const [name, setName] = useState((cfg0.name as string) ?? 'cortes.digital')
@@ -336,9 +336,10 @@ export default function TweetTemplatePage() {
     setItems(prev => prev.filter(x => x.key !== key))
     setPreviewKey(k => (k === key ? null : k))
   }
-  const clearAll = () => {
+  const clearAll = async () => {
     if (!items.length) return
-    if (items.length > 1 && !window.confirm(`Remover todos os ${items.length} vídeos da fila?`)) return
+    if (items.length > 1 && !(await confirmDialog(`Remover todos os ${items.length} vídeos da fila?`,
+      { title: 'Limpar fila', confirmLabel: 'Remover tudo', danger: true }))) return
     setItems([]); setPreviewKey(null); setAutoGen(false); toast('Fila esvaziada')
   }
 

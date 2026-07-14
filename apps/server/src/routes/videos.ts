@@ -7,7 +7,8 @@ import { spawn } from 'node:child_process'
 import { requireAuth, requireApproved } from '../middleware/auth.js'
 import { UPLOAD_DIR, DATA_DIR, newVideo, videos } from '../store.js'
 import { cookiesStatus, startConnectInstagram } from '../instagram/connect.js'
-import { probeVideo } from '../render/probe.js'
+import { probeVideo, lowerPriority } from '../render/probe.js'
+import { downloadLimiter, directLimiter } from '../util/limiter.js'
 
 export const videosRouter = Router()
 videosRouter.use(requireAuth, requireApproved)
@@ -63,6 +64,7 @@ function cookieArgs(): string[] {
 function ytdlp(args: string[], timeoutMs = 180_000): Promise<string> {
   return new Promise((resolve, reject) => {
     const p = spawn(YTDLP, args)
+    lowerPriority(p.pid)
     let out = '', err = ''
     const timer = setTimeout(() => { p.kill('SIGKILL'); reject(new Error('yt-dlp expirou')) }, timeoutMs)
     p.stdout.on('data', (d) => { out += d.toString() })
@@ -107,6 +109,7 @@ function gdlCookieArgs(): string[] {
 function galleryDl(args: string[], timeoutMs = 300_000): Promise<string> {
   return new Promise((resolve, reject) => {
     const p = spawn(GALLERYDL, args)
+    lowerPriority(p.pid)
     let out = '', err = ''
     const timer = setTimeout(() => { p.kill('SIGKILL'); reject(new Error('gallery-dl expirou')) }, timeoutMs)
     p.stdout.on('data', (d) => { out += d.toString() })
@@ -292,7 +295,7 @@ videosRouter.post('/prepare', upload.single('file'), async (req, res, next) => {
     // 2) direct CDN url → fetch immediately
     if (directUrl) {
       const dest = path.join(UPLOAD_DIR, `${Date.now()}_direct.mp4`)
-      await fetchToFile(directUrl, dest)
+      await directLimiter.run(() => fetchToFile(directUrl, dest))
       const info = await probe(dest)
       const v = newVideo(owner, { title: title || 'Vídeo', path: dest, sourceUrl: sourceUrl || directUrl, ...info, ready: true })
       return res.json({ video_id: v.id, stream_url: `/api/videos/${v.id}/stream`, ready: true, title: v.title })
@@ -302,7 +305,9 @@ videosRouter.post('/prepare', upload.single('file'), async (req, res, next) => {
     if (sourceUrl) {
       const v = newVideo(owner, { title: title || 'Baixando…', sourceUrl, ready: false })
       const dest = path.join(UPLOAD_DIR, `${Date.now()}_${v.id}.mp4`)
-      ;(async () => {
+      // anti-sufocamento: no máximo N downloads simultâneos — adicionar um
+      // perfil inteiro de uma vez não dispara 20 yt-dlp ao mesmo tempo
+      void downloadLimiter.run(async () => {
         try {
           let outPath = dest
           if (isInstagram(sourceUrl)) {
@@ -316,7 +321,7 @@ videosRouter.post('/prepare', upload.single('file'), async (req, res, next) => {
         } catch (e) {
           v.error = e instanceof Error ? e.message : 'falha no download'
         }
-      })()
+      })
       return res.json({ video_id: v.id, stream_url: `/api/videos/${v.id}/stream`, ready: false, title: v.title })
     }
 

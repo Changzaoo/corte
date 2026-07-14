@@ -7,6 +7,7 @@ import { requireAuth, requireApproved } from '../middleware/auth.js'
 import { AVATAR_DIR, OUTPUT_DIR, videos, newJob, updateJob, newClip } from '../store.js'
 import { renderTweetPreview, renderTweetVideo, type RenderOpts } from '../render/tweetRender.js'
 import { recordRenderEvent } from '../services/sessions.js'
+import { renderLimiter, previewLimiter } from '../util/limiter.js'
 
 export const tweetRouter = Router()
 
@@ -87,7 +88,8 @@ tweetRouter.post('/preview', async (req, res, next) => {
     const v = videos.get(body.video_id)
     if (!v || v.owner !== res.locals.user!.uid || !v.path || !v.ready)
       return res.status(400).json({ error: 'Vídeo não está pronto' })
-    const buf = await renderTweetPreview(optsFor(v, body.caption, body.profile, body.style, body.card_mode))
+    const buf = await previewLimiter.run(() =>
+      renderTweetPreview(optsFor(v, body.caption, body.profile, body.style, body.card_mode)))
     res.setHeader('Content-Type', 'image/jpeg')
     res.setHeader('Cache-Control', 'no-store')
     res.end(buf)
@@ -129,7 +131,9 @@ tweetRouter.post('/render', async (req, res, next) => {
         const out = path.join(OUTPUT_DIR, `tweet_${job.id}_${i + 1}.mp4`)
         try {
           updateJob(job.id, { stageDetail: `Renderizando ${i + 1}/${body.items.length}` })
-          await renderTweetVideo(optsFor(v, it.caption, body.profile, body.style, it.card_mode), out)
+          // 1 render por vez no PC inteiro — jobs paralelos esperam a vez
+          await renderLimiter.run(() =>
+            renderTweetVideo(optsFor(v, it.caption, body.profile, body.style, it.card_mode), out))
           const title = it.caption?.trim() || v.title
           newClip(owner, job.id, v.id, title, out)
           done++

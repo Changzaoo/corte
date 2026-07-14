@@ -85,7 +85,7 @@ function RoleBadge({ role }: { role: Role }) {
 function UserDrawer({ uid, onClose, onChanged }: {
   uid: string; onClose: () => void; onChanged: () => void
 }) {
-  const { toast } = useContextMenu()
+  const { toast, confirm: confirmDialog } = useContextMenu()
   const { profile: me } = useAuth()
   const [data, setData] = useState<AdminUserDetails | null>(null)
   const [tab, setTab] = useState<'summary' | 'cuts' | 'activity' | 'logins' | 'devices' | 'notes'>('summary')
@@ -153,7 +153,11 @@ function UserDrawer({ uid, onClose, onChanged }: {
                 ? <Button variant="secondary" size="sm" disabled={busy} onClick={() => act(() => api.adminReactivate(uid), 'Reativado')}><CheckCircle2 className="h-3 w-3" /> Reativar</Button>
                 : <Button variant="secondary" size="sm" disabled={busy || isSelf} onClick={() => act(() => api.adminSuspend(uid), 'Suspenso')}><XCircle className="h-3 w-3" /> Suspender</Button>}
               <Button variant="danger" size="sm" disabled={busy || isSelf}
-                onClick={() => { if (window.confirm('Excluir permanentemente este usuário?')) act(async () => { await api.adminDelete(uid); onClose() }, 'Usuário excluído') }}>
+                onClick={async () => {
+                  if (await confirmDialog('Excluir permanentemente este usuário? Essa ação não tem volta.',
+                    { title: 'Excluir usuário', confirmLabel: 'Excluir', danger: true }))
+                    act(async () => { await api.adminDelete(uid); onClose() }, 'Usuário excluído')
+                }}>
                 <Trash2 className="h-3 w-3" /> Excluir
               </Button>
             </div>

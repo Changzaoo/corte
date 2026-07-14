@@ -68,7 +68,10 @@ var
   Kill: String;
 begin
   Result := '';
-  Kill := 'Get-CimInstance Win32_Process -Filter "Name=''node.exe''" | ' +
+  Kill := 'Get-CimInstance Win32_Process -Filter "Name=''powershell.exe''" | ' +
+          'Where-Object { $_.CommandLine -like ''*watchdog.ps1*'' } | ' +
+          'ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }; ' +
+          'Get-CimInstance Win32_Process -Filter "Name=''node.exe''" | ' +
           'Where-Object { $_.CommandLine -like ''*cortes.digital*'' } | ' +
           'ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }; ' +
           'Start-Sleep -Seconds 1';
