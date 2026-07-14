@@ -3,38 +3,11 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
-import { fileURLToPath } from 'node:url'
 import { config } from '../config.js'
 import { requireAuth } from '../middleware/auth.js'
+import { appDir, installedSha } from '../util/version.js'
 
 export const systemRouter = Router()
-
-/** Raiz do app instalado (a pasta que contém package.json/apps/scripts).
- *  O vbs do instalador roda o node com cwd = AppDir; em dev o cwd é a raiz do
- *  repo. Fallback: sobe a partir deste arquivo até achar o package.json raiz. */
-function appDir(): string {
-  const looksRight = (d: string) => fs.existsSync(path.join(d, 'package.json')) && fs.existsSync(path.join(d, 'apps', 'server'))
-  if (looksRight(process.cwd())) return process.cwd()
-  let d = path.dirname(fileURLToPath(import.meta.url))
-  for (let i = 0; i < 8; i++) {
-    if (looksRight(d)) return d
-    d = path.dirname(d)
-  }
-  return process.cwd()
-}
-
-/** Sha instalado: version.json (gravado pelo updater) tem prioridade sobre o
- *  build-info.json (carimbado na raiz quando o instalador é compilado). */
-function installedSha(): { sha: string | null; updatedAt: string | null } {
-  const root = appDir()
-  for (const f of ['version.json', 'build-info.json']) {
-    try {
-      const j = JSON.parse(fs.readFileSync(path.join(root, f), 'utf8'))
-      if (typeof j.sha === 'string' && j.sha) return { sha: j.sha, updatedAt: j.updatedAt || j.builtAt || null }
-    } catch { /* próximo */ }
-  }
-  return { sha: null, updatedAt: null }
-}
 
 // Versão do backend em execução — usada pelo site para detectar atualização.
 // uptimeSec ajuda a diagnosticar reinícios do watchdog.

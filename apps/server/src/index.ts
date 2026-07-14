@@ -11,6 +11,7 @@ import { tweetRouter } from './routes/tweet.js'
 import { jobsRouter } from './routes/jobs.js'
 import { clipsRouter } from './routes/clips.js'
 import { systemRouter } from './routes/system.js'
+import { startAutoUpdate } from './services/autoupdate.js'
 
 const app = express()
 app.set('trust proxy', 1)
@@ -83,4 +84,7 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 app.listen(config.port, () => {
   console.log(`[corte-api] listening on :${config.port} (${config.nodeEnv})`)
   console.log(`[corte-api] admin emails: ${config.adminEmails.join(', ') || '(none)'}`)
+  // app instalado no PC se mantém atualizado sozinho (checa o GitHub e pede o
+  // update ao watchdog quando está ocioso) — sem baixar o instalador de novo
+  startAutoUpdate()
 })
