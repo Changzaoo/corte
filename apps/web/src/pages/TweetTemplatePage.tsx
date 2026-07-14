@@ -600,7 +600,11 @@ export default function TweetTemplatePage() {
                     <div key={p.id} onClick={() => selectProfile(p)} title={`Usar @${p.handle}`}
                       className={`group relative flex shrink-0 cursor-pointer items-center gap-xs rounded-full border py-[3px] pl-[3px] pr-sm ${active ? 'border-primary-500 bg-primary-500/10' : 'border-slate-700 bg-slate-800/60 hover:border-slate-500'}`}>
                       {p.avatarId
-                        ? <img src={api.tweetAvatarUrl(p.avatarId)} alt="" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+                        ? <img src={api.tweetAvatarUrl(p.avatarId)} alt=""
+                            // foto não existe mais neste backend (ex.: enviada p/ a nuvem
+                            // antes de instalar) → LIMPA a referência morta do perfil
+                            // salvo em vez de só esconder — senão o 404 repete p/ sempre
+                            onError={() => setProfiles(prev => prev.map(x => x.id === p.id ? { ...x, avatarId: null } : x))}
                             className="h-6 w-6 rounded-full object-cover" />
                         : <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold text-white">{(p.name.trim()[0] || '?').toUpperCase()}</span>}
                       <span className="max-w-[110px] truncate text-[11px] text-slate-200">{p.name}</span>
