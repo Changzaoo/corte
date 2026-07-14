@@ -103,9 +103,24 @@ try {
     Log "versao carimbada: $sha"
   }
 
-  # 7) libera o watchdog e religa o backend (mesmo vbs do instalador / autostart)
-  Remove-Item $lockFile -Force -ErrorAction SilentlyContinue
+  # 7) REGENERA o vbs (instalacoes antigas apontavam o node direto, sem o
+  #    watchdog; o update precisa migrar para o watchdog tambem), libera o
+  #    lock e religa o backend
   $vbs = Join-Path $AppDir 'corte-run.vbs'
+  $watchdog = Join-Path $AppDir 'scripts\watchdog.ps1'
+  if (Test-Path $watchdog) {
+    $q = [char]34
+    $runArg = "powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File $q$q$watchdog$q$q -AppDir $q$q$AppDir$q$q"
+    @(
+      'Set sh = CreateObject("WScript.Shell")'
+      "sh.CurrentDirectory = $q$AppDir$q"
+      "sh.Run $q$runArg$q, 0, False"
+    ) | Set-Content -Path $vbs -Encoding ascii
+    $startup = [Environment]::GetFolderPath('Startup')
+    Copy-Item $vbs (Join-Path $startup 'Corte.vbs') -Force -ErrorAction SilentlyContinue
+    Log "vbs regenerado (watchdog)"
+  }
+  Remove-Item $lockFile -Force -ErrorAction SilentlyContinue
   if (Test-Path $vbs) { & wscript.exe $vbs; Log "backend religado" }
   else { Log "aviso: corte-run.vbs nao encontrado - religue manualmente" }
 

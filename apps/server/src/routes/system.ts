@@ -37,9 +37,10 @@ function installedSha(): { sha: string | null; updatedAt: string | null } {
 }
 
 // Versão do backend em execução — usada pelo site para detectar atualização.
+// uptimeSec ajuda a diagnosticar reinícios do watchdog.
 systemRouter.get('/version', (_req, res) => {
   const v = installedSha()
-  res.json({ ...v, local: config.localMode })
+  res.json({ ...v, local: config.localMode, uptimeSec: Math.round(process.uptime()) })
 })
 
 // Dispara a auto-atualização (somente no app instalado no PC). O script baixa
