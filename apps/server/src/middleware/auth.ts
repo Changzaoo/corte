@@ -9,9 +9,11 @@ export interface AuthUser { uid: string; email: string | null; role: Role; recor
 // Constroi um AuthUser "dono" para o modo local. Se o app mandou um idToken,
 // lemos (SEM verificar — e a maquina do proprio dono) o nome/uid/email de
 // dentro dele para manter a identidade real; senao usamos um usuario generico.
+// IMPORTANTE: usa bearer() (header OU ?token=) — <video src>/<a download> não
+// mandam header; sem o ?token= o uid virava 'local' e o dono não batia (404,
+// player preto nos resultados).
 function localUserFromReq(req: Request): AuthUser {
-  const h = req.get('authorization') || ''
-  const token = h.startsWith('Bearer ') ? h.slice(7).trim() : ''
+  const token = bearer(req) || ''
   let uid = 'local', email: string | null = 'local@corte', name = 'Você (local)', photo: string | undefined
   if (token && token.split('.').length === 3) {
     try {

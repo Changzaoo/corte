@@ -69,7 +69,8 @@ clipsRouter.get('/download-all', (req, res) => {
   const zip = archiver('zip', { store: true })
   zip.on('error', () => res.end())
   zip.pipe(res)
-  list.forEach((c, i) => zip.file(c.path, { name: `${i + 1}_${path.basename(c.path)}` }))
+  // nome dentro do zip = nome real do arquivo (a legenda), sem prefixo numérico
+  list.forEach((c) => zip.file(c.path, { name: path.basename(c.path) }))
   zip.finalize()
 })
 
@@ -77,5 +78,8 @@ clipsRouter.get('/:id/download', (req, res) => {
   const c = clips.get(Number(req.params.id))
   if (!c || c.owner !== res.locals.user!.uid || !fs.existsSync(c.path))
     return res.status(404).json({ error: 'Clipe não encontrado' })
+  // inline (o <video> dos resultados usa esta rota); o atributo download do
+  // <a> baixa com o nome real do arquivo vindo do Content-Disposition
+  res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(path.basename(c.path))}`)
   res.sendFile(path.resolve(c.path))
 })

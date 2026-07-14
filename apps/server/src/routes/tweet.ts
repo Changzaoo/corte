@@ -63,6 +63,19 @@ function normMode(m?: string): 'auto' | 'card' | 'reskin' {
   return m === 'card' || m === 'reskin' ? m : 'auto'
 }
 
+/** Nome do arquivo = a legenda (1ª linha) ou o título do vídeo — igual ao
+ *  projeto down. Sem prefixo "tweetNN"; _unique evita sobrescrever. */
+function clipFileName(caption: string, fallback: string): string {
+  const first = (caption.trim().split(/\r?\n/)[0] || fallback).trim()
+  const safe = first.replace(new RegExp('[\<\>\:\"\/\\\|\?\*]+', 'g'), '').replace(/\s+/g, ' ').trim().slice(0, 80).replace(/[. ]+$/, '')
+  return safe || fallback
+}
+function uniquePath(dir: string, base: string): string {
+  let p = path.join(dir, `${base}.mp4`)
+  for (let n = 2; fs.existsSync(p); n++) p = path.join(dir, `${base} (${n}).mp4`)
+  return p
+}
+
 function optsFor(video: { path: string | null; width: number; height: number; duration: number },
   caption: string, profile: z.infer<typeof profileSchema>, style: z.infer<typeof styleSchema>,
   cardMode?: string): RenderOpts {
@@ -128,7 +141,8 @@ tweetRouter.post('/render', async (req, res, next) => {
       for (let i = 0; i < body.items.length; i++) {
         const it = body.items[i]
         const v = videos.get(it.video_id)!
-        const out = path.join(OUTPUT_DIR, `tweet_${job.id}_${i + 1}.mp4`)
+        // nome do arquivo = legenda/título (como no down), sem sobrescrever
+        const out = uniquePath(OUTPUT_DIR, clipFileName(it.caption || '', v.title || `tweet_${job.id}_${i + 1}`))
         try {
           updateJob(job.id, { stageDetail: `Renderizando ${i + 1}/${body.items.length}` })
           // 1 render por vez no PC inteiro — jobs paralelos esperam a vez
