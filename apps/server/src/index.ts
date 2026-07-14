@@ -10,6 +10,7 @@ import { videosRouter, downloaderRouter } from './routes/videos.js'
 import { tweetRouter } from './routes/tweet.js'
 import { jobsRouter } from './routes/jobs.js'
 import { clipsRouter } from './routes/clips.js'
+import { systemRouter } from './routes/system.js'
 
 const app = express()
 app.set('trust proxy', 1)
@@ -68,6 +69,7 @@ app.use('/api/downloader', downloaderRouter)
 app.use('/api/tweet', tweetRouter)
 app.use('/api/jobs', jobsRouter)
 app.use('/api/clips', clipsRouter)
+app.use('/api/system', systemRouter)
 
 // central error handler → JSON { error }
 // eslint-disable-next-line @typescript-eslint/no-unused-vars

@@ -24,6 +24,9 @@ firebase-adminsdk*.json
 # artefato de build do instalador (a cópia servida fica em apps/web/public)
 installer/*.exe
 
+# carimbo de versão gravado pelo auto-update no PC do usuário (runtime)
+/version.json
+
 # logs
 *.log
 npm-debug.log*

@@ -209,6 +209,10 @@ export const api = {
   reportNetSpeed: (d: { avgMbps?: number | null; downMbps?: number | null; upMbps?: number | null; rttMs?: number | null; effectiveType?: string | null }) =>
     request<void>('POST', '/api/me/netspeed', d),
 
+  // ---- backend local: versão instalada + auto-update ------------------------
+  systemVersion: () => request<{ sha: string | null; updatedAt: string | null; local: boolean }>('GET', '/api/system/version'),
+  systemUpdate: () => request<{ ok: boolean; message?: string }>('POST', '/api/system/update'),
+
   // ---- admin ---------------------------------------------------------------
   adminOverview: () => request<AdminOverview>('GET', '/api/admin/overview'),
   adminListUsers: (q = '') => request<{ users: AdminUser[] }>('GET', `/api/admin/users${q ? `?q=${encodeURIComponent(q)}` : ''}`),
