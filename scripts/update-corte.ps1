@@ -84,16 +84,25 @@ try {
   robocopy $src $AppDir /E /NFL /NDL /NJH /NJS /XD node_modules .git | Out-Null
   if ($LASTEXITCODE -ge 8) { throw "robocopy falhou (codigo $LASTEXITCODE)" }
 
-  # 5) dependencias + build do servidor
+  # 5) dependencias + build do servidor. IMPORTANTE: redirecionar DENTRO do
+  #    cmd /c - em PS 5.1, "& npm ... 2>&1" com ErrorActionPreference=Stop
+  #    transforma ate um "npm warn" em erro fatal e aborta o update.
   Refresh-Path
   Push-Location $AppDir
   try {
+    $npmLog = Join-Path $tmp 'npm.log'
     Log "npm install"
-    & npm install --no-audit --no-fund 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "npm install falhou (codigo $LASTEXITCODE)" }
+    & cmd /c "npm install --no-audit --no-fund > `"$npmLog`" 2>&1"
+    if ($LASTEXITCODE -ne 0) {
+      $tailTxt = (Get-Content $npmLog -Tail 6 -ErrorAction SilentlyContinue) -join ' | '
+      throw "npm install falhou ($LASTEXITCODE): $tailTxt"
+    }
     Log "build do servidor"
-    & npm run build:server 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "build falhou (codigo $LASTEXITCODE)" }
+    & cmd /c "npm run build:server > `"$npmLog`" 2>&1"
+    if ($LASTEXITCODE -ne 0) {
+      $tailTxt = (Get-Content $npmLog -Tail 6 -ErrorAction SilentlyContinue) -join ' | '
+      throw "build falhou ($LASTEXITCODE): $tailTxt"
+    }
   } finally { Pop-Location }
 
   # 6) carimba a versao instalada (o backend novo responde esse sha em /api/system/version)
