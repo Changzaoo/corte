@@ -346,16 +346,32 @@ export default function TweetTemplatePage() {
   const readyItems = items.filter(i => i.videoId != null && !i.error)
   const preview = items.find(i => i.key === previewKey) ?? items[0] ?? null
 
+  const pollFails = useRef(0)
   const pollJob = useCallback(async (id: number) => {
     try {
       const [js, cl] = await Promise.all([api.getJob(id), api.listClips(id).catch(() => [] as Clip[])])
+      pollFails.current = 0
       setJob(js); setClips(cl)
       if (js.status === 'done' || js.status === 'failed') {
         if (js.status === 'failed') setError(js.error_message || 'Falha ao gerar')
         return
       }
-    } catch { /* keep polling */ }
+    } catch (e) {
+      // job sumiu (o backend reiniciou, ex.: auto-update) → PARA de martelar
+      // 404 para sempre; limpa o estado e avisa. 2 falhas seguidas com "não
+      // encontrado" (evita limpar por um flap isolado p/ nuvem) ou 8 de
+      // qualquer tipo (~12s fora do ar).
+      pollFails.current += 1
+      const gone = e instanceof Error && /não encontrado/i.test(e.message)
+      if ((gone && pollFails.current >= 2) || pollFails.current >= 8) {
+        pollFails.current = 0
+        setJobId(null); setJob(null); setClips([]); setError(null)
+        toast('O backend reiniciou — a geração anterior foi encerrada', 'error')
+        return
+      }
+    }
     pollRef.current = window.setTimeout(() => pollJob(id), 1500)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {

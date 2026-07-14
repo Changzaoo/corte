@@ -56,7 +56,13 @@ app.use(cors({
 }))
 
 app.use(express.json({ limit: '2mb' }))
-app.use(rateLimit({ windowMs: 15 * 60_000, max: 1000, standardHeaders: true, legacyHeaders: false }))
+// Rate-limit SÓ na nuvem e nunca no /health: o backend local é a máquina do
+// próprio dono (limitar = 429 em sessão ativa → sonda de detecção falha → o
+// site "cai pra nuvem" e quebra tudo); /health é a sonda do app.
+app.use(rateLimit({
+  windowMs: 15 * 60_000, max: 4000, standardHeaders: true, legacyHeaders: false,
+  skip: (req) => config.localMode || req.path === '/health',
+}))
 
 app.get('/', (_req, res) => res.json({ ok: true, service: 'corte-api', ts: new Date().toISOString() }))
 // 'app' marca que é o backend do cortes.digital (detecção do "instalado no PC");
