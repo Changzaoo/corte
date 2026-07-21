@@ -8,6 +8,12 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=2" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png?v=2" />
     <title>cortes.digital — cortes no template do X</title>
+    <script>
+      // Acorda a nuvem JÁ (Render free hiberna; cold start ~30-60s): o ping
+      // dispara no parse do HTML, em paralelo com bundle/Firebase — quando o
+      // app precisar do /api/me, o servidor já está subindo há segundos.
+      fetch('https://corte-api.onrender.com/health', { mode: 'no-cors', cache: 'no-store' }).catch(function () {})
+    </script>
   </head>
   <body>
     <div id="root"></div>

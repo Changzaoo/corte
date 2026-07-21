@@ -51,9 +51,12 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
 }
 
 export function AdminRoute({ children }: { children: ReactNode }) {
-  const { user, loading, isAdmin } = useAuth()
+  const { user, loading, isAdmin, profile, profileLoading } = useAuth()
   if (loading) return <FullScreenLoader />
   if (!user) return <Navigate to="/login" replace />
+  // sem perfil em cache ainda (1ª visita / nuvem acordando): espera só aqui —
+  // o resto do app nunca bloqueia no perfil
+  if (!profile && profileLoading) return <FullScreenLoader />
   if (!isAdmin) return <Navigate to="/criar/template" replace />
   return <>{children}</>
 }
