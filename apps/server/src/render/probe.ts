@@ -33,6 +33,18 @@ export function probeVideo(input: string): Promise<Probe> {
   })
 }
 
+/** true se o vídeo tem faixa de áudio (parseia o banner do ffmpeg). Usado para
+ *  aplicar a cadeia de áudio anti-detecção só quando há som. */
+export function hasAudio(input: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const p = spawn(FFMPEG, ['-hide_banner', '-i', input])
+    let err = ''
+    p.stderr.on('data', (d) => { err += d.toString() })
+    p.on('error', () => resolve(false))
+    p.on('close', () => resolve(/\bAudio:/.test(err)))
+  })
+}
+
 export function runFfmpeg(args: string[], onProgress?: (line: string) => void): Promise<void> {
   return new Promise((resolve, reject) => {
     const p = spawn(FFMPEG, ['-hide_banner', '-y', ...args])

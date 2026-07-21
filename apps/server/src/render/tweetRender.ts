@@ -3,8 +3,11 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import sharp from 'sharp'
 import { TMP_DIR } from '../store.js'
-import { runFfmpeg } from './probe.js'
+import { runFfmpeg, hasAudio } from './probe.js'
 import { detectExistingCard, buildReskinOverlay, composeReskinVideo, composeReskinFrame } from './reskin.js'
+import {
+  type UniquifySpec, NEUTRAL, randomUniquify, mediaColorOps, zoomOp, audioChain, speedSetpts, encodeArgs,
+} from './uniquify.js'
 
 const W = 1080, H = 1920
 
@@ -131,20 +134,27 @@ async function buildCard(opts: RenderOpts): Promise<{ cardPath: string; maskPath
 
 const isHexColor = (s?: string) => !!s && /^#?[0-9a-fA-F]{6}$/.test(s)
 
-function filterGraph(L: Layout, bg?: string): string {
+function filterGraph(L: Layout, bg: string | undefined, s: UniquifySpec, withAudio: boolean): { graph: string; maps: string[] } {
   const { MW, MH, MX, MY } = L
   // Fundo: 'blur' (desfoque do próprio vídeo) OU uma cor sólida (#RRGGBB).
   const bgLayer = isHexColor(bg)
     ? `color=c=0x${bg!.replace('#', '')}:s=${W}x${H}[bg]`
     : `[0:v]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},gblur=sigma=26,eq=brightness=-0.28:saturation=1.08,setsar=1[bg]`
-  return [
+  // mídia interna com as transformações anti-detecção (espelho/zoom/cor/grão)
+  const media = `[0:v]scale=${MW}:${MH}:force_original_aspect_ratio=increase,crop=${MW}:${MH}${zoomOp(s, MW, MH)}${mediaColorOps(s)},setsar=1[m0]`
+  const parts = [
     bgLayer,
-    `[0:v]scale=${MW}:${MH}:force_original_aspect_ratio=increase,crop=${MW}:${MH},setsar=1[m0]`,
+    media,
     `[2:v]scale=${MW}:${MH},format=gray[mk]`,
     `[m0][mk]alphamerge[med]`,
     `[bg][1:v]overlay=0:0:format=auto[c1]`,
-    `[c1][med]overlay=${MX}:${MY}:format=auto[vout]`,
-  ].join(';')
+    `[c1][med]overlay=${MX}:${MY}:format=auto[c2]`,
+    `[c2]${speedSetpts(s)}[vout]`,
+  ]
+  const maps = ['-map', '[vout]']
+  if (withAudio) { parts.push(`[0:a]${audioChain(s)}[aout]`); maps.push('-map', '[aout]') }
+  else maps.push('-map', '0:a?')
+  return { graph: parts.join(';'), maps }
 }
 
 /** Reskin (troca só o perfil num card já embutido no vídeo) quando o modo pede
@@ -162,24 +172,28 @@ async function tryReskin(opts: RenderOpts): Promise<{ overlayPath: string } | nu
   return { overlayPath }
 }
 
-/** Full render → mp4 at outPath. */
+/** Full render → mp4 at outPath. Aplica a uniquização anti-detecção. */
 export async function renderTweetVideo(opts: RenderOpts, outPath: string): Promise<void> {
   const rs = await tryReskin(opts)
   if (rs) {
-    try { await composeReskinVideo(opts.videoPath, rs.overlayPath, outPath) }
+    // reskin: card já embutido → NÃO espelha (inverteria o texto do card)
+    const spec = randomUniquify({ allowMirror: false })
+    try { await composeReskinVideo(opts.videoPath, rs.overlayPath, outPath, spec) }
     finally { fs.rm(rs.overlayPath, () => {}) }
     return
   }
+  const spec = randomUniquify()   // modo card: pode espelhar (só a mídia interna)
+  const withAudio = await hasAudio(opts.videoPath)
   const L = await buildCard(opts)
+  const { graph, maps } = filterGraph(L, opts.style.bg, spec, withAudio)
   try {
     await runFfmpeg([
       '-i', opts.videoPath,
       '-loop', '1', '-i', L.cardPath,
       '-loop', '1', '-i', L.maskPath,
-      '-filter_complex', filterGraph(L, opts.style.bg),
-      '-map', '[vout]', '-map', '0:a?',
-      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p',
-      '-c:a', 'aac', '-b:a', '128k', '-r', '30', '-shortest', '-movflags', '+faststart',
+      '-filter_complex', graph,
+      ...maps,
+      ...encodeArgs(spec),
       outPath,
     ])
   } finally {
@@ -202,13 +216,14 @@ export async function renderTweetPreview(opts: RenderOpts): Promise<Buffer> {
   }
   const L = await buildCard(opts)
   const outPath = path.join(TMP_DIR, `prev_${crypto.randomBytes(6).toString('hex')}.jpg`)
+  const { graph } = filterGraph(L, opts.style.bg, NEUTRAL, false)
   try {
     await runFfmpeg([
       ...(still > 0 ? ['-ss', still.toFixed(2)] : []),
       '-i', opts.videoPath,
       '-loop', '1', '-i', L.cardPath,
       '-loop', '1', '-i', L.maskPath,
-      '-filter_complex', filterGraph(L, opts.style.bg),
+      '-filter_complex', graph,
       '-map', '[vout]', '-frames:v', '1', '-q:v', '3',
       outPath,
     ])

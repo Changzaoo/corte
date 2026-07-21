@@ -12,7 +12,8 @@ import os from 'node:os'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import sharp from 'sharp'
-import { FFMPEG, probeVideo, runFfmpeg } from './probe.js'
+import { FFMPEG, probeVideo, runFfmpeg, hasAudio } from './probe.js'
+import { type UniquifySpec, NEUTRAL, audioChain, speedSetpts, encodeArgs } from './uniquify.js'
 
 const THEMES = {
   light: { card: '#FFFFFF', text: '#0F1419', muted: '#536471', border: '#CFD9DE' },
@@ -504,14 +505,27 @@ export async function buildReskinOverlay(
 // ---------------------------------------------------------------------------
 // Composição: sobrepõe o patch estático no vídeo inteiro (vídeo interno intocado)
 // ---------------------------------------------------------------------------
-export async function composeReskinVideo(videoPath: string, overlayPng: string, outPath: string): Promise<void> {
+export async function composeReskinVideo(videoPath: string, overlayPng: string, outPath: string, spec?: UniquifySpec): Promise<void> {
+  const s = spec ?? NEUTRAL
+  const withAudio = await hasAudio(videoPath)
+  // vídeo inteiro (card embutido) + overlay do perfil novo → jitter de cor/grão
+  // e velocidade; SEM espelho/zoom (inverteria/cortaria o card já embutido)
+  const colorOps: string[] = []
+  if (s.brightness || s.contrast !== 1 || s.saturation !== 1)
+    colorOps.push(`eq=brightness=${s.brightness}:contrast=${s.contrast}:saturation=${s.saturation}`)
+  if (s.hue) colorOps.push(`hue=h=${s.hue}`)
+  if (s.noise) colorOps.push(`noise=alls=${s.noise}:allf=t`)
+  const vchain = ['[0:v][1:v]overlay=0:0:format=auto', ...colorOps, 'format=yuv420p', speedSetpts(s)].join(',')
+  const parts = [`${vchain}[outv]`]
+  const maps = ['-map', '[outv]']
+  if (withAudio) { parts.push(`[0:a]${audioChain(s)}[outa]`); maps.push('-map', '[outa]') }
+  else maps.push('-map', '0:a?')
   await runFfmpeg([
     '-i', videoPath,
     '-loop', '1', '-i', overlayPng,
-    '-filter_complex', '[0:v][1:v]overlay=0:0:format=auto,format=yuv420p[outv]',
-    '-map', '[outv]', '-map', '0:a?',
-    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-pix_fmt', 'yuv420p',
-    '-c:a', 'aac', '-b:a', '128k', '-shortest', '-movflags', '+faststart',
+    '-filter_complex', parts.join(';'),
+    ...maps,
+    ...encodeArgs(s),
     outPath,
   ])
 }
